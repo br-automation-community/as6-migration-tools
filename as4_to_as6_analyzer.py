@@ -251,6 +251,32 @@ def process_file_devices(file_path):
     return list(results)  # Convert back to a list for consistency
 
 
+def process_ftp_configurations(file_path):
+    """
+    Args:
+        file_path: Path to the .hw file.
+
+    Returns:
+        list: Unique matches found in the file.
+    """
+    results = set()
+    with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+        content = f.read()
+        # Regex to extract if the FTP server is activated
+        matches = re.search(
+            r'<Parameter ID="ActivateFtpServer"\s+Value="(\d)" />', content
+        )
+        if not matches or matches.group(0) == "1":
+            matches = re.findall(
+                r'<Parameter ID="FTPMSPartition\d+"\s+Value="(.*?)" />', content
+            )
+            if matches:
+                for match in matches:
+                    if "SYSTEM" == match:
+                        results.add((match, file_path))
+    return list(results)  # Convert back to a list for consistency
+
+
 def process_lby_file(file_path, patterns):
     """
     Processes a .lby file to find obsolete dependencies.
@@ -422,6 +448,10 @@ def main():
                 os.path.join(args.project_path, "Physical"), [".hw"], process_file_devices
             )
 
+            ftp_configs = scan_files_parallel(
+                os.path.join(args.project_path, "Physical"), [".hw"], process_ftp_configurations,
+            )
+
             lby_dependency_results = scan_files_parallel(
                 os.path.join(args.project_path, "Logical"), [".lby"], process_lby_file, obsolete_dict
             )
@@ -511,6 +541,20 @@ def main():
                     log(f"\nHardware configuration: {config_name}")
                     for name, path in sorted(entries):
                         log(f"- {name}: {path}")
+            else:
+                log("- None")
+
+            log("\n\nThe following potentially invalid ftp configurations were found: (accessing system instead of user partition)")
+            if ftp_configs:
+                grouped_results = {}
+                for name, file_path in ftp_configs:
+                    config_name = os.path.basename(os.path.dirname(file_path))
+                    grouped_results.setdefault(config_name, set()).add(name)
+
+                for config_name, entries in grouped_results.items():
+                    log(f"\nHardware configuration: {config_name}")
+                    for name in sorted(entries):
+                        log(f"- Accessing '{name}'")
             else:
                 log("- None")
 
