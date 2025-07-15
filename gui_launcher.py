@@ -53,6 +53,7 @@ class MigrationGUI:
             "AsStringToAsBrStr": resource_path("helpers/asstring_to_asbrstr.py"),
             "OpcUa Update": resource_path("helpers/asopcua_update.py"),
             "Create mapp folders": resource_path("helpers/create_mapp_folders.py"),
+            "mappMotion Update": resource_path("helpers/mappmotion_update.py"),
         }
 
         self.build_ui()
