@@ -406,8 +406,7 @@ class ModernMigrationGUI:
         if file_path:
             try:
                 log_content = self.log_text.get("1.0", "end")
-                with open(file_path, "w", encoding="utf-8") as f:
-                    f.write(log_content)
+                Path(file_path).write_text(log_content, encoding="utf-8")
                 messagebox.showinfo("Success", f"Log saved to:\n{file_path}")
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to save file:\n{e}")

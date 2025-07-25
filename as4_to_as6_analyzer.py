@@ -9,9 +9,6 @@ from pathlib import Path
 from checks import *
 from utils import utils
 
-# Path to the main package file
-root_pkg_path = r"Logical\Libraries\Package.pkg"
-
 # path to the current script
 script_directory = Path(__file__).resolve().parent
 
@@ -28,10 +25,10 @@ discontinuation_info = {
 }
 
 try:
+    discontinuation_dir = Path(script_directory) / "discontinuations"
     for filename in discontinuation_info:
-        with open(
-            f"{script_directory}/discontinuations/{filename}.json", "r"
-        ) as json_file:
+        file_path = discontinuation_dir / f"{filename}.json"
+        with file_path.open("r", encoding="utf-8") as json_file:
             discontinuation_info[filename] = json.load(json_file)
 except Exception as e:
     print(
@@ -92,7 +89,7 @@ def scan_files_parallel(root_dir, extensions, process_function, *args):
     Scans files in a directory tree in parallel for specific content.
 
     Args:
-        root_dir (str): The root directory to search in.
+        root_dir (Path): The root directory to search in.
         extensions (list): File extensions to include.
         process_function (callable): The function to apply on each file.
         *args: Additional arguments to pass to the process_function.
@@ -101,19 +98,21 @@ def scan_files_parallel(root_dir, extensions, process_function, *args):
         list: Aggregated results from all scanned files.
     """
     results = []
-    file_paths = []
 
-    for root, _, files in os.walk(root_dir):
-        for file in files:
-            if any(file.endswith(ext) for ext in extensions):
-                file_paths.append(os.path.join(root, file))
+    file_paths = [
+        str(path)
+        for ext in extensions
+        for path in root_dir.rglob(f"*{ext}")
+        if path.is_file()
+    ]
 
     total_files = len(file_paths)
     display_progress(f"Found {total_files} files to process...")
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
         futures = {
-            executor.submit(process_function, path, *args): path for path in file_paths
+            executor.submit(process_function, str(path), *args): path
+            for path in file_paths
         }
         for i, future in enumerate(concurrent.futures.as_completed(futures), 1):
             display_progress(f"Processing file {i}/{total_files}...")
@@ -135,14 +134,14 @@ def process_pkg_file(file_path, patterns):
         list: Matches found in the file.
     """
     results = []
-    with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-        content = f.read()
-        # Regex for library names between > and <
-        matches = re.findall(r">([^<]+)<", content, re.IGNORECASE)
-        for match in matches:
-            for pattern, reason in patterns.items():
-                if match.lower() == pattern.lower():
-                    results.append((pattern, reason, file_path))
+    content = Path(file_path).read_text(encoding="utf-8", errors="ignore")
+
+    # Regex for library names between > and <
+    matches = re.findall(r">([^<]+)<", content, re.IGNORECASE)
+    for match in matches:
+        for pattern, reason in patterns.items():
+            if match.lower() == pattern.lower():
+                results.append((pattern, reason, file_path))
     return results
 
 
@@ -158,14 +157,14 @@ def process_var_file(file_path, patterns):
         list: Matches found in the file.
     """
     results = []
-    with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-        content = f.read()
-        # Regex for function block declarations, e.g., : MpAlarmXConfigMapping;
-        matches = re.findall(r":\s*([A-Za-z0-9_]+)\s*;", content)
-        for match in matches:
-            for pattern, reason in patterns.items():
-                if match.lower() == pattern.lower():
-                    results.append((pattern, reason, file_path))
+    content = Path(file_path).read_text(encoding="utf-8", errors="ignore")
+
+    # Regex for function block declarations, e.g., : MpAlarmXConfigMapping;
+    matches = re.findall(r":\s*([A-Za-z0-9_]+)\s*;", content)
+    for match in matches:
+        for pattern, reason in patterns.items():
+            if match.lower() == pattern.lower():
+                results.append((pattern, reason, file_path))
     return results
 
 
@@ -182,19 +181,16 @@ def process_st_c_file(file_path, patterns):
     """
     results = []
     matched_files = set()  # To store file paths and ensure uniqueness
+    content = Path(file_path).read_text(encoding="utf-8", errors="ignore")
 
-    with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-        content = f.read()
-
-        # Check for other patterns if necessary
-        for pattern, reason in patterns.items():
-            if (
-                re.search(rf"\b{re.escape(pattern)}\b", content)
-                and file_path not in matched_files
-            ):
-                results.append((pattern, reason, file_path))
-                matched_files.add(file_path)  # Ensure file is added only once
-
+    # Check for other patterns if necessary
+    for pattern, reason in patterns.items():
+        if (
+            re.search(rf"\b{re.escape(pattern)}\b", content)
+            and file_path not in matched_files
+        ):
+            results.append((pattern, reason, file_path))
+            matched_files.add(file_path)  # Ensure file is added only once
     return results
 
 
@@ -210,16 +206,16 @@ def process_hw_file(file_path, hardware_dict):
         list: Unique matches found in the file.
     """
     results = set()  # Use a set to store unique matches
-    with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-        content = f.read()
-        # Regex to extract the Type value from the <Module> elements
-        matches = re.findall(r'<Module [^>]*Type="([^"]+)"', content)
-        for hw_type in matches:
-            for reason, items in hardware_dict.items():
-                if hw_type in items:
-                    results.add(
-                        (hw_type, reason, file_path)
-                    )  # Add as a tuple to ensure uniqueness
+    content = Path(file_path).read_text(encoding="utf-8", errors="ignore")
+
+    # Regex to extract the Type value from the <Module> elements
+    matches = re.findall(r'<Module [^>]*Type="([^"]+)"', content)
+    for hw_type in matches:
+        for reason, items in hardware_dict.items():
+            if hw_type in items:
+                results.add(
+                    (hw_type, reason, file_path)
+                )  # Add as a tuple to ensure uniqueness
     return list(results)  # Convert back to a list for consistency
 
 
@@ -233,17 +229,17 @@ def process_file_devices(file_path):
     """
     exclude = ["C:\\", "D:\\", "E:\\", "F:\\"]
     results = set()  # Use a set to store unique matches
-    with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-        content = f.read()
-        # Regex to extract the value from the file device elements
-        matches = re.findall(
-            r'<Group ID="FileDevice\d+" />\s*<Parameter ID="FileDeviceName\d+" Value="(.*?)" />\s*<Parameter ID="FileDevicePath\d+" Value="(.*?)" />',
-            content,
-        )
-        for name, path in matches:
-            for exclusion in exclude:
-                if path.lower().startswith(exclusion.lower()):
-                    results.add((name, path, file_path))
+    content = Path(file_path).read_text(encoding="utf-8", errors="ignore")
+
+    # Regex to extract the value from the file device elements
+    matches = re.findall(
+        r'<Group ID="FileDevice\d+" />\s*<Parameter ID="FileDeviceName\d+" Value="(.*?)" />\s*<Parameter ID="FileDevicePath\d+" Value="(.*?)" />',
+        content,
+    )
+    for name, path in matches:
+        for exclusion in exclude:
+            if path.lower().startswith(exclusion.lower()):
+                results.add((name, path, file_path))
     return list(results)  # Convert back to a list for consistency
 
 
@@ -256,20 +252,18 @@ def process_ftp_configurations(file_path):
         list: Unique matches found in the file.
     """
     results = set()
-    with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-        content = f.read()
-        # Regex to extract if the FTP server is activated
-        matches = re.search(
-            r'<Parameter ID="ActivateFtpServer"\s+Value="(\d)" />', content
+    content = Path(file_path).read_text(encoding="utf-8", errors="ignore")
+
+    # Regex to extract if the FTP server is activated
+    matches = re.search(r'<Parameter ID="ActivateFtpServer"\s+Value="(\d)" />', content)
+    if not matches or matches.group(0) == "1":
+        matches = re.findall(
+            r'<Parameter ID="FTPMSPartition\d+"\s+Value="(.*?)" />', content
         )
-        if not matches or matches.group(0) == "1":
-            matches = re.findall(
-                r'<Parameter ID="FTPMSPartition\d+"\s+Value="(.*?)" />', content
-            )
-            if matches:
-                for match in matches:
-                    if "SYSTEM" == match:
-                        results.add((match, file_path))
+        if matches:
+            for match in matches:
+                if "SYSTEM" == match:
+                    results.add((match, file_path))
     return list(results)  # Convert back to a list for consistency
 
 
@@ -285,19 +279,19 @@ def process_lby_file(file_path, patterns):
         list: Matches found in the file in the format (library_name, dependency, reason, file_path).
     """
     results = []
-    with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-        content = f.read()
-        # Extract library name (directory name as identifier)
-        library_name = os.path.basename(os.path.dirname(file_path))
-        # Extract dependencies from the XML content
-        dependencies = re.findall(
-            r'<Dependency ObjectName="([^"]+)"', content, re.IGNORECASE
-        )
-        for dependency in dependencies:
-            for pattern, reason in patterns.items():
-                # Compare case-insensitively
-                if dependency.lower() == pattern.lower():
-                    results.append((library_name, dependency, reason, file_path))
+    content = Path(file_path).read_text(encoding="utf-8", errors="ignore")
+
+    # Extract library name (directory name as identifier)
+    library_name = os.path.basename(os.path.dirname(file_path))
+    # Extract dependencies from the XML content
+    dependencies = re.findall(
+        r'<Dependency ObjectName="([^"]+)"', content, re.IGNORECASE
+    )
+    for dependency in dependencies:
+        for pattern, reason in patterns.items():
+            # Compare case-insensitively
+            if dependency.lower() == pattern.lower():
+                results.append((library_name, dependency, reason, file_path))
     return results
 
 
@@ -314,18 +308,15 @@ def process_c_cpp_hpp_includes_file(file_path, patterns):
     """
     results = []
     include_pattern = re.compile(r'#include\s+[<"]([^">]+)[">]')
+    content = Path(file_path).read_text(encoding="utf-8", errors="ignore")
 
-    with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-        content = f.readlines()
-
-        for line in content:
-            match = include_pattern.search(line)
-            if match:
-                included_library = match.group(1).lower()  # Normalize case
-                for pattern, reason in patterns.items():
-                    if included_library == f"{pattern.lower()}.h":
-                        results.append((pattern, reason, file_path))
-
+    for line in content:
+        match = include_pattern.search(line)
+        if match:
+            included_library = match.group(1).lower()  # Normalize case
+            for pattern, reason in patterns.items():
+                if included_library == f"{pattern.lower()}.h":
+                    results.append((pattern, reason, file_path))
     return results
 
 
@@ -342,13 +333,13 @@ def process_manual_libraries(file_path, patterns):
         list: Matches found in the file.
     """
     results = []
-    with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-        content = f.read()
-        matches = re.findall(r">([^<]+)<", content, re.IGNORECASE)
-        for match in matches:
-            for library, action in patterns.items():
-                if match.lower() == library.lower():
-                    results.append((library, action, file_path))
+    content = Path(file_path).read_text(encoding="utf-8", errors="ignore")
+
+    matches = re.findall(r">([^<]+)<", content, re.IGNORECASE)
+    for match in matches:
+        for library, action in patterns.items():
+            if match.lower() == library.lower():
+                results.append((library, action, file_path))
     return results
 
 
@@ -440,63 +431,66 @@ def main():
                     "https://help.br-automation.com/#/en/6/revinfos/version-info/projekt_aus_automation_studio_4_ubernehmen/automation_studio/notwendige_anpassungen_im_automation_studio_4_projekt.html"
                 )
 
+            logical_path = Path(args.project_path) / "Logical"
+            physical_path = Path(args.project_path) / "Physical"
+
             # Use project_path as the root directory for scanning
             manual_libs_results = scan_files_parallel(
-                os.path.join(args.project_path, "Logical"),
+                logical_path,
                 [".pkg"],
                 process_manual_libraries,
                 manual_process_libraries,
             )
 
             invalid_pkg_files = scan_files_parallel(
-                os.path.join(args.project_path, "Logical"),
+                logical_path,
                 [".pkg"],
                 process_pkg_file,
                 obsolete_dict,
             )
 
             invalid_var_typ_files = scan_files_parallel(
-                os.path.join(args.project_path, "Logical"),
+                logical_path,
                 [".var", ".typ"],
                 process_var_file,
                 obsolete_function_blocks,
             )
 
             invalid_st_c_files = scan_files_parallel(
-                os.path.join(args.project_path, "Logical"),
+                logical_path,
                 [".st", ".c", ".cpp"],
                 process_st_c_file,
                 obsolete_functions,
             )
 
             hardware_results = scan_files_parallel(
-                os.path.join(args.project_path, "Physical"),
+                physical_path,
                 [".hw"],
                 process_hw_file,
                 unsupported_hardware,
             )
 
             file_devices = scan_files_parallel(
-                os.path.join(args.project_path, "Physical"),
+                physical_path,
                 [".hw"],
                 process_file_devices,
             )
 
             ftp_configs = scan_files_parallel(
-                os.path.join(args.project_path, "Physical"),
+                physical_path,
                 [".hw"],
                 process_ftp_configurations,
             )
 
             lby_dependency_results = scan_files_parallel(
-                os.path.join(args.project_path, "Logical"),
+                logical_path,
                 [".lby"],
                 process_lby_file,
                 obsolete_dict,
             )
 
             c_include_dependency_results = scan_files_parallel(
-                os.path.join(args.project_path, "Logical"),
+                logical_path,
                 [".c", ".cpp", ".hpp"],
                 process_c_cpp_hpp_includes_file,
                 obsolete_dict,
@@ -504,7 +498,7 @@ def main():
 
             # Store the list of files containing deprecated string functions
             deprecated_string_files = check_deprecated_string_functions(
-                os.path.join(args.project_path, "Logical"),
+                logical_path,
                 [".st"],
                 deprecated_string_functions,
             )
@@ -518,7 +512,7 @@ def main():
 
             # Store the list of files containing deprecated math functions
             deprecated_math_files = check_deprecated_math_functions(
-                os.path.join(args.project_path, "Logical"),
+                logical_path,
                 [".st"],
                 deprecated_math_functions,
             )
@@ -531,7 +525,7 @@ def main():
             found_deprecated_math = bool(deprecated_math_files)
 
             log("\n\nChecking project and hardware files for compatibility...")
-            file_patterns = ["*.apj", "*.hw"]
+            file_patterns = [".apj", ".hw"]
             compatibility_results = check_files_for_compatibility(
                 args.project_path, file_patterns
             )
@@ -545,9 +539,7 @@ def main():
                 log_v("- All project and hardware files are valid.")
 
             log("\n\nChecking OPC configuration...")
-            uad_misplaced_files, uad_old_version = check_uad_files(
-                os.path.join(args.project_path, "Physical")
-            )
+            uad_misplaced_files, uad_old_version = check_uad_files(physical_path)
             if uad_misplaced_files:
                 log(
                     "The following .uad files are not located in the required Connectivity/OpcUA directory:"

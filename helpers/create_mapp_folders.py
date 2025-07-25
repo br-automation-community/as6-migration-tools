@@ -1,6 +1,8 @@
 import argparse
 import os
 import sys
+from pathlib import Path
+
 from lxml import etree
 
 from utils import utils
@@ -22,8 +24,8 @@ def add_mapp_package(
     utils.log(f"\nStart fixing {package_name}")
 
     # Try to open and parse cpu.pkg as XML
-    cpu_pkg_path = os.path.join(config_folder_path, subfolders[0], "cpu.pkg")
-    if os.path.exists(cpu_pkg_path):
+    cpu_pkg_path = Path(config_folder_path) / subfolders[0] / "cpu.pkg"
+    if cpu_pkg_path.exists():
         try:
             tree = etree.parse(cpu_pkg_path)
             root = tree.getroot()
@@ -106,21 +108,20 @@ def add_mapp_package(
         utils.log(f"cpu.pkg file not found in {config_folder_path}")
 
     # Check if package folder exists in the subfolders
-    plc_folder_path = os.path.join(config_folder_path, subfolders[0], package_name)
-    if os.path.exists(plc_folder_path):
+    plc_folder_path = Path(config_folder_path) / subfolders[0] / package_name
+    if plc_folder_path.exists():
         utils.log_v(f"Found {package_name} folder in {folder}")
         return True
     else:
         # Create package folder structure
-        os.makedirs(plc_folder_path, exist_ok=True)
+        plc_folder_path.mkdir(parents=True, exist_ok=True)
         utils.log_v(f"No {package_name} folder found")
         utils.log_v(f"Created {package_name} directory: {plc_folder_path}")
 
         # Create Package.pkg file with specified content
         package_content = f"""<?xml version="1.0" encoding="utf-8"?><?AutomationStudio FileVersion="4.9"?><Package SubType="{package_type}" PackageType="{package_type}" xmlns="http://br-automation.co.at/AS/Package"><Objects /></Package>"""
-        package_file_path = os.path.join(plc_folder_path, "Package.pkg")
-        with open(package_file_path, "w", encoding="utf-8") as f:
-            f.write(package_content)
+        package_file_path = plc_folder_path / "Package.pkg"
+        package_file_path.write_text(package_content, encoding="utf-8")
 
         utils.log_v(f"Created Package.pkg file in {package_file_path}")
         utils.log(f"{package_name} folder structure created successfully!")
@@ -155,59 +156,51 @@ def main():
     utils.log(f"Using project file: {apj_file}\n")
 
     # Get all folders in the Physical directory
-    physical_path = os.path.join(project_path, "Physical")
-    if os.path.exists(physical_path) and os.path.isdir(physical_path):
-        physical_folders = [
-            f
-            for f in os.listdir(physical_path)
-            if os.path.isdir(os.path.join(physical_path, f))
-        ]
+    physical_path = Path(project_path) / "Physical"
+    if not physical_path.is_dir():
+        utils.log("Could not find Physical folder")
+        return
 
-        for folder in physical_folders:
-            config_folder_path = os.path.join(physical_path, folder)
+    config_folders = [f for f in physical_path.iterdir() if f.is_dir()]
+    for config_folder in config_folders:
+        # Check if mappServices folder exists in the config folder directory
+        utils.log(f"\nFound configuration folder: {config_folder.name}")
 
-            # Check if mappServices folder exists in the config folder directory
-            if os.path.exists(config_folder_path):
-                utils.log(f"\nFound configuration folder: {config_folder_path}")
+        # Check for sub folders in the config folder
+        subfolders = [sf for sf in config_folder.iterdir() if sf.is_dir()]
+        if not subfolders:
+            continue
 
-                # Check for sub folders in the config folder
-                subfolders = [
-                    f
-                    for f in os.listdir(config_folder_path)
-                    if os.path.isdir(os.path.join(config_folder_path, f))
-                ]
-
-                if subfolders:
-                    # Add mappServices package
-                    mapp_services_exists = add_mapp_package(
-                        config_folder_path,
-                        subfolders,
-                        folder,
-                        "mappServices",
-                        "mappServices",
-                    )
-
-                    # Add mappMotion package
-                    mapp_motion_exists = add_mapp_package(
-                        config_folder_path,
-                        subfolders,
-                        folder,
-                        "mappMotion",
-                        "mappMotion",
-                    )
-
-                    # Add mappView package
-                    mapp_view_exists = add_mapp_package(
-                        config_folder_path,
-                        subfolders,
-                        folder,
-                        "mappView",
-                        "mappViewControl",
-                    )
-
-        utils.log(
-            f"\nPlease close and reopen the project in Automation Studio to see the changes."
+        # Add mappServices package
+        mapp_services_exists = add_mapp_package(
+            str(config_folder),
+            subfolders,
+            config_folder.name,
+            "mappServices",
+            "mappServices",
         )
+
+        # Add mappMotion package
+        mapp_motion_exists = add_mapp_package(
+            str(config_folder),
+            subfolders,
+            config_folder.name,
+            "mappMotion",
+            "mappMotion",
+        )
+
+        # Add mappView package
+        mapp_view_exists = add_mapp_package(
+            str(config_folder),
+            subfolders,
+            config_folder.name,
+            "mappView",
+            "mappViewControl",
+        )
+
+    utils.log(
+        f"\nPlease close and reopen the project in Automation Studio to see the changes."
+    )
 
 
 if __name__ == "__main__":

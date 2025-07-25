@@ -1,18 +1,17 @@
 import os
 import re
 import sys
+from pathlib import Path
 
 from utils import utils
 
 
-def replace_functions_and_constants(file_path: str, function_mapping, constant_mapping):
+def replace_functions_and_constants(file_path: Path, function_mapping, constant_mapping):
     """
     Replace function calls and constants in a file based on the provided mappings.
     """
-    original_hash = utils.calculate_file_hash(file_path)
-
-    with open(file_path, "r", encoding="iso-8859-1", errors="ignore") as f:
-        original_content = f.read()
+    original_hash = utils.calculate_file_hash(str(file_path))
+    original_content = file_path.read_text(encoding="iso-8859-1", errors="ignore")
 
     modified_content = original_content
     function_replacements = 0
@@ -42,10 +41,9 @@ def replace_functions_and_constants(file_path: str, function_mapping, constant_m
         constant_replacements += num_replacements
 
     if modified_content != original_content:
-        with open(file_path, "w", encoding="iso-8859-1") as f:
-            f.write(modified_content)
+        file_path.write_text(modified_content, encoding="iso-8859-1")
 
-        new_hash = utils.calculate_file_hash(file_path)
+        new_hash = utils.calculate_file_hash(str(file_path))
         if original_hash == new_hash:
             return function_replacements, constant_replacements, False
 
@@ -61,16 +59,14 @@ def check_for_library(project_path, library_names):
     """
     Checks if any specified library is used in the project.
     """
-    pkg_file = os.path.join(project_path, "Logical", "Libraries", "Package.pkg")
-    if not os.path.isfile(pkg_file):
+    project_path = Path(project_path)
+    pkg_file = project_path / "Logical" / "Libraries" / "Package.pkg"
+    if not pkg_file.is_file():
         print(f"Error: Could not find Package.pkg file in: {pkg_file}")
         return []
 
-    with open(pkg_file, "r", encoding="iso-8859-1", errors="ignore") as f:
-        content = f.read()
-        found_libraries = [lib for lib in library_names if lib in content]
-
-    return found_libraries
+    content = pkg_file.read_text(encoding="iso-8859-1", errors="ignore")
+    return [lib for lib in library_names if lib in content]
 
 
 def main():
@@ -136,25 +132,23 @@ def main():
         "UCtoU8": "brwUCtoU8",
     }
 
-    logical_path = os.path.join(project_path, "Logical")
+    logical_path = Path(project_path) / "Logical"
     total_function_replacements = 0
     total_constant_replacements = 0
     total_files_changed = 0
 
     # Loop through the files in the "Logical" directory and process .st and .ab files
-    for root, _, files in os.walk(logical_path):
-        for file in files:
-            if file.endswith((".st", ".ab")):
-                file_path = os.path.join(root, file)
-                function_replacements, constant_replacements, changed = (
-                    replace_functions_and_constants(
-                        file_path, function_mapping, constant_mapping
-                    )
+    for file_path in Path(logical_path).rglob("*"):
+        if file_path.suffix in {".st", ".ab"}:
+            function_replacements, constant_replacements, changed = (
+                replace_functions_and_constants(
+                    file_path, function_mapping, constant_mapping
                 )
-                if changed:
-                    total_function_replacements += function_replacements
-                    total_constant_replacements += constant_replacements
-                    total_files_changed += 1
+            )
+            if changed:
+                total_function_replacements += function_replacements
+                total_constant_replacements += constant_replacements
+                total_files_changed += 1
 
     print("\nSummary:")
     print(f"Total functions replaced: {total_function_replacements}")
