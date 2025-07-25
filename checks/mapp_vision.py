@@ -1,5 +1,5 @@
-import os
 import re
+from pathlib import Path
 
 
 def check_vision_settings(directory):
@@ -24,38 +24,27 @@ def check_vision_settings(directory):
     }
 
     # Find the .apj file in the directory
-    apj_file = None
-    for file in os.listdir(directory):
-        if file.endswith(".apj"):
-            apj_file = os.path.join(directory, file)
-            break
-
+    apj_file = next(Path(directory).glob("*.apj"), None)
     if not apj_file:
         return vision_settings_result
 
     # If .apj file is found, check for mappVision line in the .apj file
-    with open(apj_file, "r", encoding="utf-8", errors="ignore") as f:
+    with Path(apj_file).open(encoding="utf-8", errors="ignore") as f:
         for line in f:
             if "<mappVision " in line and "Version=" in line:
                 match = re.search(r'Version="(\d+)\.(\d+)', line)
                 if match:
-                    major = int(match.group(1))
-                    minor = int(match.group(2))
                     vision_settings_result["found"] = True
-                    vision_settings_result["version"] = f"{major}.{minor}"
+                    vision_settings_result["version"] = f"{match.group(1)}.{match.group(2)}"
 
     # Walk through all directories
-    for root, dirs, files in os.walk(os.path.join(directory, "Physical")):
-        # Check if "mappVision" folder exists in current directory
-        if "mappVision" in dirs:
-            vision_path = os.path.join(root, "mappVision")
-            vision_settings_result["locations"].append(vision_path)
+    physical_path = Path(directory) / "Physical"
+    for path in physical_path.rglob("mappVision"):
+        if path.is_dir():
+            vision_settings_result["locations"].append(str(path))
 
-            # Count files in the mappVision folder and its subdirectories
-            file_count = 0
-            for sub_root, _, sub_files in os.walk(vision_path):
-                file_count += len(sub_files)
-
-            vision_settings_result["total_files"] += file_count
+            # Count all files in mappVision and its subdirectories
+            total_files = sum(1 for _ in path.rglob("*") if _.is_file())
+            vision_settings_result["total_files"] += total_files
 
     return vision_settings_result

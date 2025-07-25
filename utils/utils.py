@@ -37,7 +37,8 @@ def log_v(message, log_file=None, prepend=""):
 
 
 def get_and_check_project_file(project_path):
-    if not os.path.exists(project_path):
+    project_path = Path(project_path)
+    if not project_path.exists():
         if sys.stdin.isatty():
             print(ConsoleColors.ERROR)
         print(
@@ -52,8 +53,8 @@ def get_and_check_project_file(project_path):
         sys.exit(1)
 
     # Check if .apj file exists in the provided path
-    apj_files = [file for file in os.listdir(project_path) if file.endswith(".apj")]
-    if not apj_files:
+    apj_file = next(project_path.glob("*.apj"), None)
+    if not apj_file:
         if sys.stdin.isatty():
             print(ConsoleColors.ERROR)
         print(
@@ -65,7 +66,7 @@ def get_and_check_project_file(project_path):
             print(f"{ConsoleColors.RESET}\n")
         sys.exit(1)
 
-    return apj_files[0]
+    return os.path.basename(apj_file)
 
 
 def calculate_file_hash(file_path):

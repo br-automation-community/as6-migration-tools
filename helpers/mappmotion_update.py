@@ -3,17 +3,17 @@
 import argparse
 import os
 import re
+from pathlib import Path
 
 from utils import utils
 
 
-def warn_inputs(file_path, item_mappings):
+def warn_inputs(file_path: Path, item_mappings):
     """
     Warn about enumerators and FB-inputs in a file based on the provided mappings.
     """
 
-    with open(file_path, "r", encoding="iso-8859-1", errors="ignore") as f:
-        original_content = f.read()
+    original_content = file_path.read_text(encoding="iso-8859-1", errors="ignore")
 
     for old_item, new_item in item_mappings.items():
         pattern = re.escape(old_item)
@@ -25,16 +25,14 @@ def warn_inputs(file_path, item_mappings):
             )
 
 
-def replace_enums(file_path, enum_mapping):
+def replace_enums(file_path: Path, enum_mapping):
     """
     Replace enumerators in a file based on the provided mappings.
     """
 
     original_hash = utils.calculate_file_hash(file_path)
 
-    with open(file_path, "r", encoding="iso-8859-1", errors="ignore") as f:
-        original_content = f.read()
-
+    original_content = file_path.read_text(encoding="iso-8859-1", errors="ignore")
     modified_content = original_content
     enum_replacements = 0
 
@@ -52,8 +50,7 @@ def replace_enums(file_path, enum_mapping):
         enum_replacements += num_replacements
 
     if modified_content != original_content:
-        with open(file_path, "w", encoding="iso-8859-1") as f:
-            f.write(modified_content)
+        file_path.write_text(modified_content, encoding="iso-8859-1")
 
         new_hash = utils.calculate_file_hash(file_path)
         if original_hash == new_hash:
@@ -65,15 +62,12 @@ def replace_enums(file_path, enum_mapping):
     return enum_replacements, False
 
 
-def replace_inputs(file_path, input_mapping):
+def replace_inputs(file_path: Path, input_mapping):
     """
     Replace various FUB-inputs in code based on the provided mappings
     """
     original_hash = utils.calculate_file_hash(file_path)
-
-    with open(file_path, "r", encoding="iso-8859-1", errors="ignore") as f:
-        original_content = f.read()
-
+    original_content = file_path.read_text(encoding="iso-8859-1", errors="ignore")
     modified_content = original_content
     input_replacements = 0
 
@@ -93,9 +87,7 @@ def replace_inputs(file_path, input_mapping):
         input_replacements += num_replacements
 
     if modified_content != original_content:
-        with open(file_path, "w", encoding="iso-8859-1") as f:
-            f.write(modified_content)
-
+        file_path.write_text(modified_content, encoding="iso-8859-1")
         new_hash = utils.calculate_file_hash(file_path)
         if original_hash == new_hash:
             return input_replacements, False
@@ -106,15 +98,13 @@ def replace_inputs(file_path, input_mapping):
     return input_replacements, False
 
 
-def replace_fbs_and_types(file_path, fb_mapping, type_mapping, fb_removal_mapping):
+def replace_fbs_and_types(file_path: Path, fb_mapping, type_mapping, fb_removal_mapping):
     """
     Replace function block calls and types in a file based on the provided mappings.
     """
 
     original_hash = utils.calculate_file_hash(file_path)
-
-    with open(file_path, "r", encoding="iso-8859-1", errors="ignore") as f:
-        original_content = f.read()
+    original_content = file_path.read_text(encoding="iso-8859-1", errors="ignore")
 
     modified_content = original_content
     fb_replacements = 0
@@ -164,8 +154,7 @@ def replace_fbs_and_types(file_path, fb_mapping, type_mapping, fb_removal_mappin
         type_replacements += num_replacements
 
     if modified_content != original_content:
-        with open(file_path, "w", encoding="iso-8859-1") as f:
-            f.write(modified_content)
+        file_path.write_text(modified_content, encoding="iso-8859-1")
 
         new_hash = utils.calculate_file_hash(file_path)
         if original_hash == new_hash:
@@ -183,16 +172,13 @@ def check_for_library(project_path, library_names):
     """
     Checks if any specified library is used in the project.
     """
-    pkg_file = os.path.join(project_path, "Logical", "Libraries", "Package.pkg")
-    if not os.path.isfile(pkg_file):
+    pkg_file = Path(project_path) / "Logical" /"Libraries" /"Package.pkg"
+    if not pkg_file.is_file():
         print(f"Error: Could not find Package.pkg file in: {pkg_file}")
         return []
 
-    with open(pkg_file, "r", encoding="iso-8859-1", errors="ignore") as f:
-        content = f.read()
-        found_libraries = [lib for lib in library_names if lib in content]
-
-    return found_libraries
+    content = pkg_file.read_text(encoding="iso-8859-1", errors="ignore")
+    return [lib for lib in library_names if lib in content]
 
 
 def parse_args():
@@ -311,7 +297,7 @@ def main():
         "mcAFDCSACOPOSMULTIDO_SS1X116": "mcAFDCSACOPOSMULTIDO_SS2X116",
     }
 
-    logical_path = os.path.join(project_path, "Logical")
+    logical_path = Path(project_path) / "Logical"
     total_input_replacements = 0
     total_function_replacements = 0
     total_enums_replacements = 0
@@ -319,32 +305,29 @@ def main():
     total_files_changed = 0
 
     # Loop through the files in the "Logical" directory and process .st, .c, .cpp and .ab files
-    for root, _, files in os.walk(logical_path):
-        for file in files:
-            # For now we skip all libraries, ideally we would also search and replace in user libraries
-            if "Libraries" in root:
-                continue
-            file_path = os.path.join(root, file)
-            if file.endswith((".st", ".c", ".cpp", ".ab")):
-                warn_inputs(file_path, input_mapping_warning)
-                enum_replacements, changed = replace_enums(file_path, enum_mapping)
-                if changed:
-                    total_enums_replacements += enum_replacements
-                    total_files_changed += 1
-                input_replacements, changed = replace_inputs(file_path, input_mapping)
-                if changed:
-                    total_input_replacements += input_replacements
-                    total_files_changed += 1
-            elif file.endswith((".typ", ".var", ".fun")):
-                function_replacements, type_replacements, changed = (
-                    replace_fbs_and_types(
-                        file_path, fb_mapping, type_mapping, fb_removal_mapping
-                    )
-                )
-                if changed:
-                    total_type_replacements += type_replacements
-                    total_function_replacements += function_replacements
-                    total_files_changed += 1
+
+    for file_path in logical_path.rglob("*"):
+        # For now, we skip all libraries, ideally we would also search and replace in user libraries
+        if "Libraries" in file_path.parts:
+            continue
+        if file_path.suffix in {".st", ".c", ".cpp", ".ab"}:
+            warn_inputs(file_path, input_mapping_warning)
+            enum_replacements, changed = replace_enums(file_path, enum_mapping)
+            if changed:
+                total_enums_replacements += enum_replacements
+                total_files_changed += 1
+            input_replacements, changed = replace_inputs(file_path, input_mapping)
+            if changed:
+                total_input_replacements += input_replacements
+                total_files_changed += 1
+        elif file_path.suffix in {".typ", ".var", ".fun"}:
+            function_replacements, type_replacements, changed = replace_fbs_and_types(
+                file_path, fb_mapping, type_mapping, fb_removal_mapping
+            )
+            if changed:
+                total_type_replacements += type_replacements
+                total_function_replacements += function_replacements
+                total_files_changed += 1
 
     print("\nSummary:")
     print(f"Total function blocks replaced: {total_function_replacements}")

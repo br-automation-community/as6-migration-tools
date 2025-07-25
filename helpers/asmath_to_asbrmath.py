@@ -1,19 +1,17 @@
 import os
 import re
 import sys
+from pathlib import Path
 
 from utils import utils
 
 
-def replace_functions_and_constants(file_path, function_mapping, constant_mapping):
+def replace_functions_and_constants(file_path: Path, function_mapping, constant_mapping):
     """
     Replace function calls and constants in a file based on the provided mappings.
     """
     original_hash = utils.calculate_file_hash(file_path)
-
-    with open(file_path, "r", encoding="iso-8859-1", errors="ignore") as f:
-        original_content = f.read()
-
+    original_content = file_path.read_text(encoding="iso-8859-1", errors="ignore")
     modified_content = original_content
     function_replacements = 0
     constant_replacements = 0
@@ -35,8 +33,7 @@ def replace_functions_and_constants(file_path, function_mapping, constant_mappin
         constant_replacements += num_replacements
 
     if modified_content != original_content:
-        with open(file_path, "w", encoding="iso-8859-1") as f:
-            f.write(modified_content)
+        file_path.write_text(modified_content, encoding="iso-8859-1")
 
         new_hash = utils.calculate_file_hash(file_path)
         if original_hash == new_hash:
@@ -54,21 +51,17 @@ def check_for_asmath_library(project_path):
     """
     Checks if AsMath library is used in the project.
     """
-    pkg_file = os.path.join(project_path, "Logical", "Libraries", "Package.pkg")
-    if not os.path.isfile(pkg_file):
+    pkg_file =  Path(project_path) / "Logical" / "Libraries" / "Package.pkg"
+    if not pkg_file.is_file():
         # print(f"Debug: Could not find Package.pkg file in: {pkg_file}")
         return False
 
-    with open(pkg_file, "r", encoding="iso-8859-1", errors="ignore") as f:
-        content = f.read()
-        # print("Debug: Reading Package.pkg content...")
-        # print(content)  # Show the content of Package.pkg for debugging
+    content = pkg_file.read_text(encoding="iso-8859-1", errors="ignore")
 
-        if "AsMath" in content:
-            print("AsMath library found in Package.pkg!\n")
-            return True
-        # else:
-        # print("Debug: AsMath library not found in Package.pkg.")
+    if "AsMath" in content:
+        print("AsMath library found in Package.pkg!\n")
+        return True
+
     return False
 
 
@@ -83,8 +76,6 @@ def main():
 
     print(f"Project path validated: {project_path}")
     print(f"Using project file: {apj_file}\n")
-
-    logical_path = os.path.join(project_path, "Logical")
 
     print("Checking for AsMath library in the project...")
     library_found = check_for_asmath_library(project_path)
@@ -153,19 +144,18 @@ def main():
     total_constant_replacements = 0
     total_files_changed = 0
 
-    for root, _, files in os.walk(logical_path):
-        for file in files:
-            if file.endswith((".st", ".ab")):
-                file_path = os.path.join(root, file)
-                function_replacements, constant_replacements, changed = (
-                    replace_functions_and_constants(
-                        file_path, function_mapping, constant_mapping
-                    )
+    logical_path = Path(project_path) / "Logical"
+    for path in logical_path.rglob("*"):
+        if path.suffix in (".st", ".ab"):
+            function_replacements, constant_replacements, changed = (
+                replace_functions_and_constants(
+                    path, function_mapping, constant_mapping
                 )
-                if changed:
-                    total_function_replacements += function_replacements
-                    total_constant_replacements += constant_replacements
-                    total_files_changed += 1
+            )
+            if changed:
+                total_function_replacements += function_replacements
+                total_constant_replacements += constant_replacements
+                total_files_changed += 1
 
     print("\nSummary:")
     print(f"Total functions replaced: {total_function_replacements}")
