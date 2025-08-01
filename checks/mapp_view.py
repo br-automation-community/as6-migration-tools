@@ -1,6 +1,7 @@
 import re
 import xml.etree.ElementTree as ET
 
+
 def check_mappView(apj_path, log, verbose=False):
     """
     Checks for the presence of mappView settings files in the specified directory.
@@ -52,7 +53,7 @@ def check_mappView(apj_path, log, verbose=False):
             for content_path in logical_path.rglob("*.content"):
                 tree = ET.parse(content_path)
                 root_elem = tree.getroot()
-                
+
                 for widget in root_elem.findall(".//c:Widget", ns):
                     xsi_type = widget.attrib.get(f"{{{ns['xsi']}}}type")
                     if xsi_type in {
@@ -61,8 +62,13 @@ def check_mappView(apj_path, log, verbose=False):
                         "widgets.brease.UserList",
                         "widgets.brease.MotionPad",
                     }:
-                        log('Found use of AuditList, UserList, TextPad or MotionPad widgets that requires the role of BR_Engineer', severity="INFO")
-                        log('Check in the following (Configuration View/AccessAndSecurity/UserRoleSystem/User.user) that a user with role BR_Engineer is present')
+                        log(
+                            "Found use of AuditList, UserList, TextPad or MotionPad widgets that requires the role of BR_Engineer",
+                            severity="INFO",
+                        )
+                        log(
+                            "Check in the following (Configuration View/AccessAndSecurity/UserRoleSystem/User.user) that a user with role BR_Engineer is present"
+                        )
 
     if verbose:
         # Walk through all directories
