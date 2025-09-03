@@ -5,7 +5,6 @@ import time
 from pathlib import Path
 
 from checks import *
-from checks.mapp_view_wdk import check_wdk_usage
 from utils import utils
 
 

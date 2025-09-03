@@ -72,10 +72,10 @@ def _detect_widget_library_type(widget_lib_path: Path) -> Optional[WidgetLibrary
 
     mapping_file = widget_lib_path / "WidgetLibrary.mapping"
     if mapping_file.exists():
-        # Parse xml file WidgetLibrary.mapping and search for the first "Mappings/Mapping" in the Mapping node test if a <oType> attribute exists
+        # Parse xml file WidgetLibrary.mapping and search for the first "Mapping" in the Mapping node test if a <oType> attribute exists
         tree = ET.parse(mapping_file)
         root = tree.getroot()
-        mapping_node = root.find("Mappings/Mapping")
+        mapping_node = root.find("Mapping")
         if mapping_node is not None and mapping_node.get("oType") is not None:
             return WidgetLibraryType.WDTC
         elif mapping_node is not None:
@@ -134,7 +134,7 @@ def check_widget_lib_usage(logical_path: Path, log, verbose: bool = False) -> No
                 
                 log(
                     f"Widget library {lib_name} ({rel}) appears to be a WDK (Widget Development Kit) library, which is deprecated and no longer supported in AS6."
-                    "For more information, visit the B&R Community: https://community.br-automation.com/c/wdtc/10",
+                    "\nFor more information, visit the B&R Community: https://community.br-automation.com/c/wdtc/10",
                     when="AS6",
                     severity="MANDATORY"
                 )
@@ -145,12 +145,6 @@ def check_widget_lib_usage(logical_path: Path, log, verbose: bool = False) -> No
                 if verbose:
                     log(f"Found User Widget Library 4: {lib_name} ({rel})")
                 
-                log(
-                    f"Widget library {lib_name} ({rel}) appears to be a User Widget Library from AS 4, which may not be compatible with AS6."
-                    "Please migrate to User Widget Library 6.",
-                    when="AS6",
-                    severity="WARNING"
-                )
             elif lib_type == WidgetLibraryType.USER_WIDGET_LIB_6:
                 if verbose:
                     log(f"Found User Widget Library 6: {lib_name} ({rel})")
