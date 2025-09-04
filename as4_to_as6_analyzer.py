@@ -142,8 +142,12 @@ def main():
         check_safety(apj_path, log, args.verbose)  # Safety system issues
         check_vision_settings(apj_path, log, args.verbose)  # mappVision issues
         check_mappView(apj_path, log, args.verbose)  # mappView issues
-        check_widget_lib_usage(logical_path, log, args.verbose)  # Detect widget libraries (WDK usage or User Widget Libraries from AS4)
-        check_mapp_version(apj_path, log, args.verbose)  # mappService/mapp version issues
+        check_widget_lib_usage(
+            logical_path, log, args.verbose
+        )  # Detect widget libraries (WDK usage or User Widget Libraries from AS4)
+        check_mapp_version(
+            apj_path, log, args.verbose
+        )  # mappService/mapp version issues
 
         # Finish up
         end_time = time.time()
