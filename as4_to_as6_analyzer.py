@@ -106,9 +106,6 @@ def main():
     def log(message, when="", severity=""):
         utils.log(message, log_file=file_handle, when=when, severity=severity)
 
-    # Anonymous, non-blocking usage ping (never blocks, never surfaces errors)
-    utils.bump_counter_async("run-clicks")
-
     try:
         log(
             "Scanning started... Please wait while the script analyzes your project files."
