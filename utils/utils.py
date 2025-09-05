@@ -4,47 +4,12 @@ import hashlib
 import json
 import os
 import re
-import ssl
 import sys
-import threading
-import urllib.error
-import urllib.request
 from pathlib import Path
 
 from CTkMessagebox import CTkMessagebox
 
 _CACHED_LINKS = None
-
-
-def _make_ssl_context() -> ssl.SSLContext:
-    """
-    Build a verification-enabled SSL context that:
-      - uses OpenSSL defaults, and
-      - on Windows, merges the OS certificate stores (ROOT/CA).
-    This survives corporate TLS interception (custom roots) without external deps.
-    """
-    ctx = ssl.create_default_context()
-    # On Windows, merge ROOT/CA stores into the context
-    if (
-        os.name == "nt"
-        and hasattr(ssl, "enum_certificates")
-        and hasattr(ssl, "DER_cert_to_PEM_cert")
-    ):
-        try:
-            pem_chunks = []
-            for store in ("ROOT", "CA"):
-                for cert, enc, trust in ssl.enum_certificates(store):
-                    if isinstance(cert, bytes):
-                        pem_chunks.append(ssl.DER_cert_to_PEM_cert(cert))
-            if pem_chunks:
-                ctx.load_verify_locations(cadata="".join(pem_chunks))
-        except Exception:
-            # Best-effort: context is still valid even if this fails
-            pass
-    return ctx
-
-
-_SSL_CTX = _make_ssl_context()
 
 
 class ConsoleColors:
@@ -307,69 +272,6 @@ def load_file_info(folder, filename):
     except Exception as e:
         log(f"Error loading JSON file '{filename}': {e}", severity="ERROR")
         return {}
-
-
-# Minimal telemetry adapter for non-blocking, silent run counting.
-# ---------------------- Backends --------------------------------------------
-class _AbacusBackend:
-    """Abacus (free, no-auth) hit/get counter."""
-
-    def __init__(self, namespace: str):
-        self._ns = namespace
-
-    def bump(self, metric: str = "run-clicks") -> None:
-        url = f"https://abacus.jasoncameron.dev/hit/{self._ns}/{metric}"
-        try:
-            req = urllib.request.Request(
-                url, headers={"User-Agent": "as6-migration-tools"}
-            )
-            with urllib.request.urlopen(req, timeout=3, context=_SSL_CTX):
-                pass
-        except Exception:
-            pass  # absolutely silent
-
-
-class _GenericGETBackend:
-    """
-    Generic HTTP GET backend: call a fixed URL to 'signal' a hit on an external service.
-    Use this if you ever migrate away from CountAPI to any GET-based collector.
-    """
-
-    def __init__(self, url: str):
-        self._url = url
-
-    def bump(self, metric: str = "run-clicks") -> None:
-        try:
-            req = urllib.request.Request(
-                self._url, headers={"User-Agent": "as6-migration-tools"}
-            )
-            with urllib.request.urlopen(req, timeout=3, context=_SSL_CTX):
-                pass
-        except Exception:
-            pass  # absolutely silent
-
-
-class _NoopBackend:
-    """Optional: disable counting (e.g., for local tests)."""
-
-    def bump(self, metric: str = "run-clicks") -> None:
-        pass
-
-
-# ---------------------- Defined backend ----------------------------------
-# Recommended default (public, 0-hosting). Do NOT change once live, or count resets.
-_BACKEND = _AbacusBackend(namespace="as6-migration-tools-6f2a48c7")
-# ----------------------------------------------------------------------------
-
-
-def bump_counter_async(metric: str = "run-clicks") -> None:
-    """
-    Fire-and-forget: spawns a daemon thread that never blocks and swallows errors.
-    The default metric 'run-clicks' matches the README badge.
-    """
-    threading.Thread(
-        target=_BACKEND.bump, kwargs={"metric": metric}, daemon=True
-    ).start()
 
 
 def build_web_path(links, url):

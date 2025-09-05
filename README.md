@@ -14,7 +14,6 @@
   <a href="https://github.com/br-automation-community/as6-migration-tools/releases" target="_blank" rel="noopener noreferrer">
     <img src="https://img.shields.io/github/downloads/br-automation-community/as6-migration-tools/total.svg" alt="Total downloads"/>
   </a>
-  <img src="https://img.shields.io/badge/dynamic/json?label=Runs&query=%24.value&url=https%3A%2F%2Fabacus.jasoncameron.dev%2Fget%2Fas6-migration-tools-6f2a48c7%2Frun-clicks&cacheSeconds=300" alt="Script runs"/>
   <a href="https://github.com/hilch/BandR-badges/blob/main/Made-For-BrAutomation.svg" target="_blank" rel="noopener noreferrer">
     <img src="https://github.com/hilch/BandR-badges/blob/main/Made-For-BrAutomation.svg" alt="Made for B&R"/>
   </a>
