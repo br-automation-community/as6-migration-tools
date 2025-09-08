@@ -22,5 +22,9 @@
   "Safety/Conversion": {
     "prefix": "safety_help",
     "url": "mapp_safety/getting-started/proj-conversion/umstieg_auf_mapp_safety_5.x.html"
+  },
+  "Scene Viewer Download": {
+    "prefix": "homepage_software",
+    "url": "simulation/simulation-tools/br-scene-viewer/"
   }
 }

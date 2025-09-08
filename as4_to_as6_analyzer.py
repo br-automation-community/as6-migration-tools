@@ -145,6 +145,9 @@ def main():
         check_mapp_version(
             apj_path, log, args.verbose
         )  # mappService/mapp version issues
+        check_scene_viewer(
+            apj_path, log, args.verbose
+        )  # Scene Viewer usage & requirements
 
         # Finish up
         end_time = time.time()

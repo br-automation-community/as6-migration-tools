@@ -295,6 +295,7 @@ def build_web_path(links, url):
             "safety_help": f"{path_help}/safety/",
             "opc_ua_help": f"{path_help}/communication/opcua/",
             "as4_migration": f"{path_help}/revinfos/version-info/projekt_aus_automation_studio_4_ubernehmen/automation_studio/",
+            "homepage_software": f"{path_web}/downloads/software/",
             "": f"{path_help}/",
         }
 
