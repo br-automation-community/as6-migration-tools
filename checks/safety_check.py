@@ -1,6 +1,8 @@
 import re
 import xml.etree.ElementTree as ET
 
+from utils import utils
+
 
 def check_safety_release(apj_path, log, verbose=False):
     """
@@ -29,22 +31,19 @@ def check_safety_release(apj_path, log, verbose=False):
     search_path = project_root / "Physical"
 
     for file in search_path.rglob("*.pkg"):
-        try:
-            content = file.read_text(encoding="utf-8", errors="ignore")
-            if 'SafetyRelease="' in content:
-                match = re.search(r'SafetyRelease="(\d+)\.(\d+)"', content)
-                if match and (match.group(1) != "0" or match.group(2) != "0"):
-                    log(
-                        "Legacy safety is no longer supported with AS 6.x."
-                        "\n - When upgrading from a Safety Release to mapp Safety 6.x, all conversion steps from the Safety Release "
-                        "to mapp Safety 5.x must be performed in AS 4.x first."
-                        "\n - More info: Safety/Conversion",
-                        when="AS4",
-                        severity="MANDATORY",
-                    )
-                    return True
-        except Exception as e:
-            log(f"Failed to read {file}: {e}", severity="ERROR")
+        content = utils.read_file(file)
+        if 'SafetyRelease="' in content:
+            match = re.search(r'SafetyRelease="(\d+)\.(\d+)"', content)
+            if match and (match.group(1) != "0" or match.group(2) != "0"):
+                log(
+                    "Legacy safety is no longer supported with AS 6.x."
+                    "\n - When upgrading from a Safety Release to mapp Safety 6.x, all conversion steps from the Safety Release "
+                    "to mapp Safety 5.x must be performed in AS 4.x first."
+                    "\n - More info: Safety/Conversion",
+                    when="AS4",
+                    severity="MANDATORY",
+                )
+                return True
 
     # 3. Check for *.swt files in Physical folders
     for swt_path in project_root.rglob("*.swt"):

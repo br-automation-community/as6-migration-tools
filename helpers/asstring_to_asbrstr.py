@@ -13,7 +13,7 @@ def replace_functions_and_constants(
     Replace function calls and constants in a file based on the provided mappings.
     """
     original_hash = utils.calculate_file_hash(str(file_path))
-    original_content = file_path.read_text(encoding="iso-8859-1", errors="ignore")
+    original_content = utils.read_file(file_path)
 
     modified_content = original_content
     function_replacements = 0
@@ -68,7 +68,7 @@ def check_for_library(project_path, library_names):
         utils.log(f"Could not find Package.pkg file in: {pkg_file}", severity="ERROR")
         return []
 
-    content = pkg_file.read_text(encoding="iso-8859-1", errors="ignore")
+    content = utils.read_file(pkg_file)
     return [lib for lib in library_names if lib in content]
 
 

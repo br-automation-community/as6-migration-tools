@@ -15,7 +15,7 @@ def process_file_devices(file_path):
     """
     exclude = ["C:\\", "D:\\", "E:\\", "F:\\"]
     results = set()  # Use a set to store unique matches
-    content = Path(file_path).read_text(encoding="utf-8", errors="ignore")
+    content = utils.read_file(Path(file_path))
 
     # Regex to extract the value from the file device elements
     matches = re.findall(
@@ -38,7 +38,7 @@ def process_ftp_configurations(file_path):
         list: Unique matches found in the file.
     """
     results = set()
-    content = Path(file_path).read_text(encoding="utf-8", errors="ignore")
+    content = utils.read_file(Path(file_path))
 
     # Regex to extract if the FTP server is activated
     matches = re.search(r'<Parameter ID="ActivateFtpServer"\s+Value="(\d)" />', content)

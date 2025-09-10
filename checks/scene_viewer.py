@@ -2,6 +2,8 @@
 import re
 from pathlib import Path
 
+from utils import utils
+
 
 def check_scene_viewer(apj_path: Path, log, verbose: bool = False):
     """
@@ -20,10 +22,7 @@ def check_scene_viewer(apj_path: Path, log, verbose: bool = False):
 
     # ---- 2a) mapp Robotics via .objecthierarchy ----
     for oh_file in project_root.rglob("*.objecthierarchy"):
-        try:
-            text = oh_file.read_text(encoding="utf-8", errors="ignore")
-        except Exception:
-            continue
+        text = utils.read_file(oh_file)
 
         has_scene_viewer = (
             re.search(r"Scene\s*Viewer", text, flags=re.IGNORECASE) is not None
@@ -63,10 +62,7 @@ def check_scene_viewer(apj_path: Path, log, verbose: bool = False):
 
     # ---- 2b) mapp Trak via .hw ----
     for hw_file in project_root.rglob("*.hw"):
-        try:
-            text = hw_file.read_text(encoding="utf-8", errors="ignore")
-        except Exception:
-            continue
+        text = utils.read_file(hw_file)
 
         if re.search(
             r'Name\s*=\s*"FileDeviceName\d+"\s+Value\s*=\s*"SvgData"',

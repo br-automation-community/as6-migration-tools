@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 
 from CTkMessagebox import CTkMessagebox
+from charset_normalizer import from_path
 
 _CACHED_LINKS = None
 
@@ -46,13 +47,10 @@ def get_version() -> str:
             if meipass:
                 candidates.append(Path(meipass) / "version.txt")
             for vf in candidates:
-                try:
-                    if vf.is_file():
-                        txt = vf.read_text(encoding="utf-8").strip()
-                        if txt:
-                            return txt
-                except Exception:
-                    pass
+                if vf.is_file():
+                    txt = read_file(vf).strip()
+                    if txt:
+                        return txt
     except Exception:
         pass
 
@@ -305,3 +303,13 @@ def build_web_path(links, url):
 
     # Default-url for unknown paths
     return f"{path_web}/product/{url}"
+
+
+def read_file(file: Path):
+    try:
+        return file.read_text(encoding="utf-8", errors="ignore")
+    except Exception:
+        result = from_path(file).best()
+        if result:
+            return file.read_text(encoding=result.encoding, errors="ignore")
+    return ""

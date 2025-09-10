@@ -1,6 +1,8 @@
 import re
 import xml.etree.ElementTree as ET
 
+from utils import utils
+
 
 def check_mappView(apj_path, log, verbose=False):
     """
@@ -9,7 +11,7 @@ def check_mappView(apj_path, log, verbose=False):
     log("─" * 80 + "\nChecking mappView version in project file...")
 
     # Check for mappView line in the .apj file
-    for line in apj_path.read_text(encoding="utf-8", errors="ignore").splitlines():
+    for line in utils.read_file(apj_path).splitlines():
         if "<mappView " in line and "Version=" in line:
             match = re.search(r'Version="(\d+)\.(\d+)', line)
             if match:

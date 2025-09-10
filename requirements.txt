@@ -2,3 +2,4 @@ lxml>=6.0.0
 customtkinter>=5.2.0
 CTkMenuBar>=0.4.4
 CTkMessageBox>=2.7
+charset-normalizer>=3.4.3

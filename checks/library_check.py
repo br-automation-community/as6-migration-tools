@@ -17,7 +17,7 @@ def process_pkg_file(file_path, patterns):
         list: Matches found in the file.
     """
     results = []
-    content = Path(file_path).read_text(encoding="utf-8", errors="ignore")
+    content = utils.read_file(Path(file_path))
 
     # Regex for library names between > and <
     matches = re.findall(r">([^<]+)<", content, re.IGNORECASE)
@@ -40,7 +40,7 @@ def process_lby_file(file_path, patterns):
         list: Matches found in the file in the format (library_name, dependency, reason, file_path).
     """
     results = []
-    content = Path(file_path).read_text(encoding="utf-8", errors="ignore")
+    content = utils.read_file(Path(file_path))
 
     # Extract library name (directory name as identifier)
     library_name = os.path.basename(os.path.dirname(file_path))
@@ -69,7 +69,7 @@ def process_c_cpp_hpp_includes_file(file_path, patterns):
     """
     results = []
     include_pattern = re.compile(r'#include\s+[<"]([^">]+)[">]')
-    content = Path(file_path).read_text(encoding="utf-8", errors="ignore")
+    content = utils.read_file(Path(file_path))
 
     for line in content:
         match = include_pattern.search(line)
@@ -94,7 +94,7 @@ def process_manual_libraries(file_path, patterns):
         list: Matches found in the file.
     """
     results = []
-    content = Path(file_path).read_text(encoding="utf-8", errors="ignore")
+    content = utils.read_file(Path(file_path))
 
     matches = re.findall(r">([^<]+)<", content, re.IGNORECASE)
     for match in matches:

@@ -13,7 +13,7 @@ def warn_inputs(file_path: Path, item_mappings):
     Warn about enumerators and FB-inputs in a file based on the provided mappings.
     """
 
-    original_content = file_path.read_text(encoding="iso-8859-1", errors="ignore")
+    original_content = utils.read_file(file_path)
 
     for old_item, new_item in item_mappings.items():
         pattern = re.escape(old_item)
@@ -33,8 +33,7 @@ def replace_enums(file_path: Path, enum_mapping, verbose=False):
     """
 
     original_hash = utils.calculate_file_hash(file_path)
-
-    original_content = file_path.read_text(encoding="iso-8859-1", errors="ignore")
+    original_content = utils.read_file(file_path)
     modified_content = original_content
     enum_replacements = 0
 
@@ -72,7 +71,7 @@ def replace_inputs(file_path: Path, input_mapping, verbose=False):
     Replace various FUB-inputs in code based on the provided mappings
     """
     original_hash = utils.calculate_file_hash(file_path)
-    original_content = file_path.read_text(encoding="iso-8859-1", errors="ignore")
+    original_content = utils.read_file(file_path)
     modified_content = original_content
     input_replacements = 0
 
@@ -115,8 +114,7 @@ def replace_fbs_and_types(
     """
 
     original_hash = utils.calculate_file_hash(file_path)
-    original_content = file_path.read_text(encoding="iso-8859-1", errors="ignore")
-
+    original_content = utils.read_file(file_path)
     modified_content = original_content
     fb_replacements = 0
     type_replacements = 0
@@ -197,7 +195,7 @@ def check_for_library(project_path, library_names):
         )
         return []
 
-    content = pkg_file.read_text(encoding="iso-8859-1", errors="ignore")
+    content = utils.read_file(pkg_file)
     return [lib for lib in library_names if lib in content]
 
 

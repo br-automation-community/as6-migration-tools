@@ -15,15 +15,11 @@ def check_deprecated_string_functions(root_dir, extensions, deprecated_functions
     for ext in extensions:
         for path in Path(root_dir).rglob(f"*{ext}"):
             if path.is_file():
-                try:
-                    content = path.read_text(encoding="utf-8", errors="ignore")
-                    if any(
-                        re.search(rf"\b{func}\b", content)
-                        for func in deprecated_functions
-                    ):
-                        deprecated_files.append(str(path))
-                except Exception:
-                    pass
+                content = utils.read_file(path)
+                if any(
+                    re.search(rf"\b{func}\b", content) for func in deprecated_functions
+                ):
+                    deprecated_files.append(str(path))
 
     return deprecated_files
 
@@ -46,12 +42,9 @@ def check_deprecated_math_functions(root_dir, extensions, deprecated_functions):
 
     for path in Path(root_dir).rglob("*"):
         if path.suffix in extensions and path.is_file():
-            try:
-                content = path.read_text(encoding="utf-8", errors="ignore")
-                if function_pattern.search(content):  # Only matches function calls
-                    deprecated_files.append(str(path))
-            except Exception:
-                pass
+            content = utils.read_file(path)
+            if function_pattern.search(content):  # Only matches function calls
+                deprecated_files.append(str(path))
 
     return deprecated_files
 
@@ -168,7 +161,7 @@ def process_var_file(file_path, patterns):
         list: Matches found in the file.
     """
     results = []
-    content = Path(file_path).read_text(encoding="utf-8", errors="ignore")
+    content = utils.read_file(Path(file_path))
 
     # Regex for function block declarations, e.g., : MpAlarmXConfigMapping;
     matches = re.findall(r":\s*([A-Za-z0-9_]+)\s*;", content)
@@ -192,7 +185,7 @@ def process_st_c_file(file_path, patterns):
     """
     results = []
     matched_files = set()  # To store file paths and ensure uniqueness
-    content = Path(file_path).read_text(encoding="utf-8", errors="ignore")
+    content = utils.read_file(Path(file_path))
 
     # Check for other patterns if necessary
     for pattern, reason in patterns.items():

@@ -1,5 +1,7 @@
 import re
 
+from utils import utils
+
 
 def check_mapp_version(apj_path, log, verbose=False):
     """
@@ -10,10 +12,7 @@ def check_mapp_version(apj_path, log, verbose=False):
     log("─" * 80 + "\nChecking mapp version in project file...")
 
     # --- Read .apj as plain text (robust vs. namespaces/BOM) ---
-    try:
-        txt = apj_path.read_text(encoding="utf-8", errors="ignore")
-    except Exception:
-        txt = apj_path.read_text(errors="ignore")
+    txt = utils.read_file(apj_path)
 
     # --- Version detection (mapp Services & mappMotion 5.x) ---
     for line in txt.splitlines():
@@ -112,18 +111,15 @@ def check_mapp_version(apj_path, log, verbose=False):
 
         cpu_pkg_path = _find_cpu_pkg_path(config_folder)
         if cpu_pkg_path:
-            try:
-                cpu_txt = cpu_pkg_path.read_text(encoding="utf-8", errors="ignore")
-                # Remove from missing if Reference="true" -> ...\<name>\Package.pkg
-                for name in list(missing):
-                    if re.search(
-                        rf'Reference\s*=\s*"true".*?{re.escape(name)}[\\/]+Package\.pkg',
-                        cpu_txt,
-                        flags=re.IGNORECASE | re.DOTALL,
-                    ):
-                        missing.discard(name)
-            except Exception as e:
-                log(f"Could not read {cpu_pkg_path}: {e}", severity="WARNING")
+            cpu_txt = utils.read_file(cpu_pkg_path)
+            # Remove from missing if Reference="true" -> ...\<name>\Package.pkg
+            for name in list(missing):
+                if re.search(
+                    rf'Reference\s*=\s*"true".*?{re.escape(name)}[\\/]+Package\.pkg',
+                    cpu_txt,
+                    flags=re.IGNORECASE | re.DOTALL,
+                ):
+                    missing.discard(name)
 
         if missing:
             grouped_results[config_folder.name] = missing

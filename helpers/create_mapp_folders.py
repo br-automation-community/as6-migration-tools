@@ -276,10 +276,7 @@ def detect_motion_choice(apj_path: str) -> str:
 
         # Final fallback: tolerant text search (covers odd encodings)
         if not has_acp10 and not has_mappmotion:
-            try:
-                txt = p.read_text(encoding="utf-8", errors="ignore")
-            except Exception:
-                txt = p.read_text(errors="ignore")
+            txt = utils.read_file(p)
             has_acp10 = "<Acp10" in txt or "Acp10" in txt
             has_mappmotion = "<mappMotion" in txt
 
@@ -293,10 +290,7 @@ def detect_motion_choice(apj_path: str) -> str:
         return "mappMotion"
     except Exception as e:
         # As a last resort, do a very cheap text probe
-        try:
-            txt = p.read_text(encoding="utf-8", errors="ignore")
-        except Exception:
-            return "none"
+        txt = utils.read_file(p)
         if "<mappMotion" in txt:
             return "mappMotion"
         if "<Acp10" in txt or "Acp10" in txt:

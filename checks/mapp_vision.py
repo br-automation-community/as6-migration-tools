@@ -10,7 +10,7 @@ def check_vision_settings(apj_path, log, verbose=False):
     log("─" * 80 + "\nChecking mappVision version in project file...")
 
     # Check for mappVision line in the .apj file
-    for line in apj_path.read_text(encoding="utf-8", errors="ignore").splitlines():
+    for line in utils.read_file(apj_path).splitlines():
         if "<mappVision " in line and "Version=" in line:
             match = re.search(r'Version="(\d+)\.(\d+)', line)
             if match:

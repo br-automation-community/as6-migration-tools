@@ -16,7 +16,7 @@ def replace_enums(file_path: Path, enum_mapping):
         return 0, False
 
     original_hash = utils.calculate_file_hash(file_path)
-    original_content = file_path.read_text(encoding="iso-8859-1", errors="ignore")
+    original_content = utils.read_file(Path(file_path))
     modified_content = original_content
     enum_replacements = 0
 
@@ -52,7 +52,7 @@ def replace_fbs_and_types(file_path: Path, fb_mapping, type_mapping):
         return 0, 0, False
 
     original_hash = utils.calculate_file_hash(file_path)
-    original_content = file_path.read_text(encoding="iso-8859-1", errors="ignore")
+    original_content = utils.read_file(Path(file_path))
     modified_content = original_content
     fb_replacements = 0
     type_replacements = 0
@@ -101,7 +101,7 @@ def check_for_library(project_path: Path, library_names):
         utils.log(f"Could not find Package.pkg file in: {pkg_file}", severity="ERROR")
         return []
 
-    content = pkg_file.read_text(encoding="iso-8859-1", errors="ignore")
+    content = utils.read_file(pkg_file)
     return [lib for lib in library_names if lib in content]
 
 

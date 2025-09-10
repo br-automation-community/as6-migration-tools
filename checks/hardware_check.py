@@ -17,7 +17,7 @@ def process_hw_file(file_path, hardware_dict):
         list: Unique matches found in the file.
     """
     results = set()  # Use a set to store unique matches
-    content = Path(file_path).read_text(encoding="utf-8", errors="ignore")
+    content = utils.read_file(Path(file_path))
 
     # Regex to extract the Type value from the <Module> elements
     matches = re.findall(r'<Module [^>]*Type="([^"]+)"', content)

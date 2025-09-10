@@ -7,13 +7,7 @@ from utils import utils
 
 def process_ansl_authentication(file_path):
     """Return [("AnslAuthentication", file_path)] if Value=\"1\" is present, else []."""
-    try:
-        content = Path(file_path).read_text(encoding="utf-8", errors="ignore")
-    except Exception:
-        try:
-            content = Path(file_path).read_text(encoding="latin-1", errors="ignore")
-        except Exception:
-            content = ""
+    content = utils.read_file(Path(file_path))
     pat = re.compile(
         r'ID\s*=\s*["\']AnslAuthentication["\']\s+[^>]*Value\s*=\s*["\']1["\']',
         re.IGNORECASE,
