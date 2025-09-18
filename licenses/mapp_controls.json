@@ -1,0 +1,5 @@
+[
+    {"name": "Hydraulics", "file": [".hydaxiscontroller",".pumpbasic"], "cnt": 0, "license": 1},
+    {"name": "Control Tools", "file": [], "cnt": 0, "license": 0},
+    {"name": "Crane", "file": [], "cnt": 0, "license": 1}
+]

@@ -1,0 +1,18 @@
+[
+    {"name": "AlarmX", "file": [".mpalarmxcore"], "cnt": 0, "license": 0},
+    {"name": "Audit", "file": [".mpaudittrail"], "cnt": 0, "license": 1},
+    {"name": "Backup", "file": [".mpbackupcore"], "cnt": 0, "license": 0},
+    {"name": "CodeBox", "file": [".mpcodebox"], "cnt": 0, "license": 1},
+    {"name": "Com", "file": [".mpcomgroup"], "cnt": 0, "license": 0},
+    {"name": "Data", "file": [".mpdatarecorder"], "cnt": 0, "license": 1},
+    {"name": "Database", "file": [".mpdatabasequery"], "cnt": 0, "license": 1},
+    {"name": "File", "file": [".mpfilemanager"], "cnt": 0, "license": 0},
+    {"name": "IO", "file": [".mpio"], "cnt": 0, "license": 1},
+    {"name": "J1939", "file": [".mpj1939generic"], "cnt": 0, "license": 0},
+    {"name": "PackML", "file": [".mppackmlstandaloneunit",".mppackmlsynchronizedunit"], "cnt": 0, "license": 1},
+    {"name": "Recipe", "file": [".mprecipexml",".mprecipecsv"], "cnt": 0, "license": 0},
+    {"name": "Report", "file": [".mpreportcore"], "cnt": 0, "license": 1},
+    {"name": "Sequence", "file": [".mpsequencecore"], "cnt": 0, "license": 1},
+    {"name": "Skyline", "file": [".mpskyline"], "cnt": 0, "license": 1},
+    {"name": "UserX", "file": [".mpuserx"], "cnt": 0, "license": 1}
+]

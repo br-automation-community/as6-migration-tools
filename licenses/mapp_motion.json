@@ -1,0 +1,12 @@
+[
+    {"name": "Single Axis", "type": "axis", "cnt": 0, "license": 0},
+    {"name": "Axis couplings", "type": "axis1", "cnt": 0, "license": 1},
+    {"name": "Backlash compensation", "type": "axis1", "cnt": 0, "license": 1},
+    {"name": "Encoderless control", "type": "axis1", "cnt": 0, "license": 1},
+    {"name": "Repetitive control", "type": "axis1", "cnt": 0, "license": 1},
+    {"name": "ISQ ripple", "type": "axis1", "cnt": 0, "license": 1},
+    {"name": "Administrative axis groups", "type": "axis1", "cnt": 0, "license": 1},
+    {"name": "reACTION", "type": "axis1", "cnt": 0, "license": 2},
+    {"name": "Model-based control", "type": "axis1", "cnt": 0, "license": 2},
+    {"name": "Future advanced functionalities", "type": "axis1", "cnt": 0, "license": 2}
+]

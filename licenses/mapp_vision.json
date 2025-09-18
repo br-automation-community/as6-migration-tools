@@ -1,0 +1,11 @@
+[
+    {"name": "Blob", "VfType": "vf-blob", "cnt": 0, "license": 1},
+    {"name": "Clutter Matching", "VfType": "vf-clutter-matching", "cnt": 0, "license": 1},
+    {"name": "Code Reader", "VfType": "vf-datacode", "cnt": 0, "license": 1},
+    {"name": "Deep OCR", "VfType": "vf-dl-deepocr", "cnt": 0, "license": 1},
+    {"name": "Matching", "VfType": "vf-matching", "cnt": 0, "license": 1},
+    {"name": "Measurement", "VfType": "vf-measurement", "cnt": 0, "license": 1},
+    {"name": "OCR", "VfType": "vf-ocr", "cnt": 0, "license": 1},
+    {"name": "Pixel Counter", "VfType": "vf-pixels", "cnt": 0, "license": 0},
+    {"name": "Subpixel Blob", "VfType": "vf-blob-subpixel", "cnt": 0, "license": 1}
+]

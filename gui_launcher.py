@@ -107,6 +107,7 @@ class ModernMigrationGUI:
             "OpcUa Update": self.resource_path("helpers/asopcua_update.py"),
             "Create mapp folders": self.resource_path("helpers/create_mapp_folders.py"),
             "MappMotion Update": self.resource_path("helpers/mappmotion_update.py"),
+            "License checker": self.resource_path("helpers/license_checker.py"),
         }
 
         self.links = utils.load_file_info("links", "links")

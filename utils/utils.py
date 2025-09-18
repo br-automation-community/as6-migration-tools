@@ -286,10 +286,22 @@ def build_web_path(links, url):
 
         # Dictionary for Prefix-Mappings
         prefix_paths = {
+            "br_web": f"{path_web}/",
+            "online_help": f"{path_help}/",
             "mapp_view_license": f"{path_web}/products/software/mapp-technology/mapp-view/mapp-view-licensing/",
             "mapp_view_widget": f"{path_help}/visualization/mappview/widgets/",
             "mapp_view_help": f"{path_help}/visualization/mappview/",
+            "mapp_view_widget_buttons": f"{path_help}/visualization/mappview/widgets/buttons/",
+            "mapp_view_widget_chart": f"{path_help}/visualization/mappview/widgets/chart/",
+            "mapp_view_widget_container": f"{path_help}/visualization/mappview/widgets/container/",
+            "mapp_view_widget_numeric": f"{path_help}/visualization/mappview/widgets/numeric/",
+            "mapp_view_widget_media": f"{path_help}/visualization/mappview/widgets/media/",
             "mapp_connect_help": f"{path_help}/visualization/mappconnect/",
+            "mapp_services_license": f"{path_web}/products/software/mapp-technology/mapp-services/mapp-services-licensing/",
+            "mapp_services_help": f"{path_help}/services/mapp_services/",
+            "mapp_vision_license": f"{path_web}/products/software/mapp-technology/mapp-vision/mapp-vision-licensing/",
+            "mapp_vision_help": f"{path_help}/machine_vision/mapp_vision/programming/vfs/",
+            "mapp_motion_help": f"{path_help}/machine_motion/",
             "safety_help": f"{path_help}/safety/",
             "opc_ua_help": f"{path_help}/communication/opcua/",
             "as4_migration": f"{path_help}/revinfos/version-info/projekt_aus_automation_studio_4_ubernehmen/automation_studio/",
@@ -313,3 +325,32 @@ def read_file(file: Path):
         if result:
             return file.read_text(encoding=result.encoding, errors="ignore")
     return ""
+
+def file_value_count(filePath, pairs):
+    with open(filePath, encoding="utf8") as item:
+        for line in item:
+            for obj in pairs:
+                if "ID=\"" + obj["id"] + "\"" and "Value=\"" + obj["value"] + "\"" in line:
+                    obj["cnt"] += 1
+    
+    return pairs
+
+def file_value_by_id(filePath, ids):
+    result = []
+    with open(filePath, encoding="utf8") as item:
+        for line in item:
+            for id in ids:
+                if id in line:
+                    pos = line.find("Value") + 7
+                    pos2 = line[pos:].find("\"")
+                    result.append({"name": id, "value": line[pos:(pos+pos2)]})
+    
+    return result
+
+def file_type_count(filePath, pairs):
+    with open(filePath, encoding="utf8") as item:
+        for line in item:
+            for type in pairs:
+                if "Type=\"" + type["type"] + "\"" in line:
+                    type["cnt"] += 1
+    return pairs

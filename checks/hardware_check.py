@@ -59,3 +59,22 @@ def check_hardware(physical_path, log, verbose=False):
     else:
         if verbose:
             log("No unsupported hardware found in the project.", severity="INFO")
+            
+def count_hardware(folder):
+    result = {}
+    for root, dirs, files in os.walk(folder):
+        for file in files:
+            arr = file.split(".")
+            if arr[1] == "hw" in file:
+                filePath = os.path.join(root, file) 
+                with open(filePath, encoding="utf8") as item:
+                    for line in item:
+                        if "<Module " in line:
+                            pos = line.find("Type") + 6
+                            pos2 = line[pos:].find("\"")
+                            module = line[pos:(pos+pos2)]
+                            if not module in result:
+                                result[module] = {"cnt": 1}
+                            else:
+                                result[module]["cnt"] += 1
+    return result
