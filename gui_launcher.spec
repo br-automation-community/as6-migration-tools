@@ -12,6 +12,7 @@ datas = [
     ('checks/*.py', 'checks'),
     ('utils/*.py', 'utils'),
     ('links/*.json', 'links'),
+    ('licenses/*.json', 'licenses'),
 ]
 if os.path.isfile('version.txt'):
     datas.append(('version.txt', '.'))
