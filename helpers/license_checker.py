@@ -27,7 +27,7 @@ def main():
     status = "Currently the following mapp technologies are supported:\n"
     status += " - mappView\n"
     status += " - mappConnect\n"
-    #status += " - mappTrak\n"
+    status += " - mappTrak\n"
     status += " - mappServices\n"
     status += " - mappVision\n"
     utils.log(status,severity="INFO",)
@@ -46,7 +46,7 @@ def main():
                 premiumWidgetCnt += 1
         
         if premiumWidgetCnt > 0:
-            status = "License " + utils.url("1TCMPVIEWWGT.10-01",) + " is needed du to:\n"
+            status = "License " + utils.url("1TCMPVIEWWGT.10-01",) + " is needed due to:\n"
             for obj in analyse["mappView"]["breaseWidgets"]:
                 if obj["cnt"] > 0 and obj["license"] > 0:
                     #print(" - widgets.brease." + obj["name"] + " used " + str(obj["cnt"]) + " " + getTimes(obj["cnt"]))
@@ -55,7 +55,7 @@ def main():
             totalLicenses.append("1TCMPVIEWWGT.10-01")
                 
         if analyse["mappView"]["clientCnt"] > 1:
-            status = "License " + utils.url("1TCMPVIEWCLT.10-01",) + " is needed du to:\n"
+            status = "License " + utils.url("1TCMPVIEWCLT.10-01",) + " is needed due to:\n"
             status += " - " + utils.url("MaxClientConnections",) + " is configured to " + str(analyse["mappView"]["clientCnt"]) + " more than 1"
             utils.log(status, severity="MANDATORY",)
             totalLicenses.append("1TCMPVIEWCLT.10-01")
@@ -122,9 +122,6 @@ def main():
         for obj in analyse["mappMotion"]["functions"]:
             if obj["type"] == "axis":
                 if obj["cnt"] > 3:
-                    
-
-
                     status = "License " + utils.url("1TCMPAXIS.10-01",) + " is needed due to:\n" + status
                     status += " - " + utils.url(obj["name"]) + " used " + str(obj["cnt"]) + " " + getTimes(obj["cnt"]) + "\n"
                     utils.log(status, severity="MANDATORY",)

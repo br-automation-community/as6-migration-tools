@@ -12,6 +12,7 @@ def mappLicenseAnalyser(project_path):
         if "mappView" in item:
             mappView = item
             break
+    result["mappView"] = None
     if mappView is not None:
         result["mappView"] = {
             "breaseWidgets": utils.load_file_info("licenses","brease_widgets"),
@@ -45,6 +46,8 @@ def mappLicenseAnalyser(project_path):
         "hardware": [],
         "collisionAvoidance": ""
     }
+    result["mappConnect"] = None
+    result["mappVision"] = None
     for root, dirs, files in os.walk(folder):
         for file in files:
             arr = file.split(".")
