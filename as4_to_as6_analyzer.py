@@ -149,6 +149,9 @@ def main():
         check_scene_viewer(
             apj_path, log, args.verbose
         )  # Scene Viewer usage & requirements
+        check_visual_components(
+            apj_path, log, args.verbose
+        )  # Visual Components VC4/VC3 issues
 
         # Finish up
 
