@@ -14,6 +14,7 @@ import customtkinter as ctk
 from CTkMenuBar import CTkMenuBar, CustomDropdownMenu
 
 import utils.utils as utils
+from utils.get_changelog import get_changelog_between_versions
 
 B_R_BLUE = "#3B82F6"
 HOVER_BLUE = "#2563EB"
@@ -1072,6 +1073,18 @@ class ModernMigrationGUI:
             pady=(10, 4), anchor="w", padx=16
         )
 
+        # Add changelog
+        current_version = utils.get_version()
+        new_version = tag.replace("v", "") if tag else ""
+
+        changelog = body
+        if current_version != "dev":
+            changelog_info = get_changelog_between_versions(
+                current_version, new_version
+            )
+            if changelog_info["success"]:
+                changelog = changelog_info["changelog"]
+
         # Scrollable release notes (use CTkTextbox if available; else fallback to tk.Text)
         text_frame = tk.Frame(win, bg=bg)
         text_frame.pack(fill="both", expand=True, padx=16)
@@ -1084,7 +1097,7 @@ class ModernMigrationGUI:
             relief="flat",
             borderwidth=0,
         )
-        notes.insert("1.0", body or "(No release notes)")
+        notes.insert("1.0", changelog or "(No release notes)")
         notes.configure(state="disabled")
         notes.pack(fill="both", expand=True)
 
