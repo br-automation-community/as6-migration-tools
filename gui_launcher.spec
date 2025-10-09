@@ -26,6 +26,7 @@ a = Analysis(
         'CTkMessagebox',
         'tkinter',
         'lxml', 'lxml.etree', 'lxml._elementpath',
+        'requests',
     ],
     hookspath=[],
     runtime_hooks=[],
