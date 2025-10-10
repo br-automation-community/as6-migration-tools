@@ -8,7 +8,7 @@ import webbrowser
 from datetime import datetime
 from html import escape
 from pathlib import Path
-from tkinter import filedialog, messagebox
+from tkinter import filedialog, messagebox, ttk
 
 import customtkinter as ctk
 from CTkMenuBar import CTkMenuBar, CustomDropdownMenu
@@ -359,13 +359,26 @@ class ModernMigrationGUI:
         )
 
     def show_about(self):
+        # Text + links (keep in English)
         about_text = (
-            "Open-source tools for analyzing and migrating B&R Automation Studio 4 (AS4) projects to Automation Studio 6 (AS6).\n\n"
-            "Detects obsolete libraries, unsupported hardware, deprecated functions – and includes helper scripts for automatic code conversion.\n\n"
-            "🔶 Disclaimer: This project is unofficial and not provided or endorsed by B&R Industrial Automation.\n"
-            "It is offered as an open-source tool, with no warranty or guarantees.\n"
-            "Use at your own risk — contributions and improvements are very welcome!"
+            "Open-source tools for analyzing and migrating B&R Automation Studio 4 (AS4) "
+            "projects to Automation Studio 6 (AS6).\n\n"
+            "Highlights:\n"
+            "• One clean, actionable report (deprecated libraries & functions, unsupported hardware, mapp changes, common pitfalls).\n"
+            "• Works fully offline; no telemetry; everything runs locally.\n"
+            "• Fast feedback on large projects; verbose mode for deep dives.\n\n"
+            "Unofficial community project — not affiliated with B&R Industrial Automation.\n"
+            "Provided as-is, without warranty."
         )
+
+        GITHUB_URL = "https://github.com/br-automation-community/as6-migration-tools"
+        RELEASES_URL = (
+            "https://github.com/br-automation-community/as6-migration-tools/releases"
+        )
+        ISSUES_URL = (
+            "https://github.com/br-automation-community/as6-migration-tools/issues"
+        )
+        LICENSE_URL = "https://github.com/br-automation-community/as6-migration-tools/blob/main/LICENSE"
 
         appearance = ctk.get_appearance_mode()
         bg = "#f0f0f0" if appearance == "Light" else "#2a2d2e"
@@ -375,8 +388,7 @@ class ModernMigrationGUI:
         msg_win.withdraw()  # Hide initially
         msg_win.title("About")
         msg_win.configure(bg=bg)
-        msg_win.geometry("720x360")
-        msg_win.resizable(False, False)
+        msg_win.resizable(False, False)  # user can't resize; we will set geometry below
 
         try:
             icon_path = os.path.join(
@@ -386,17 +398,16 @@ class ModernMigrationGUI:
         except Exception:
             pass
 
-        msg_win.update_idletasks()
-        x = self.root.winfo_rootx() + (self.root.winfo_width() // 2) - (720 // 2)
-        y = self.root.winfo_rooty() + (self.root.winfo_height() // 2) - (360 // 2)
-        msg_win.geometry(f"+{x}+{y}")
-
-        # Show version/build at the top of the About box
+        # Header + version
+        tk.Label(
+            msg_win, text="AS6 Migration Tools", font=LABEL_FONT, bg=bg, fg=fg
+        ).pack(pady=(10, 2))
         build = utils.get_version()
         tk.Label(msg_win, text=f"Version: {build}", font=LABEL_FONT, bg=bg, fg=fg).pack(
-            pady=(8, 4)
+            pady=(0, 6)
         )
 
+        # Body
         tk.Label(
             msg_win,
             text=about_text,
@@ -405,23 +416,76 @@ class ModernMigrationGUI:
             fg=fg,
             font=FIELD_FONT,
             padx=20,
-            pady=20,
+            pady=10,
             wraplength=680,
         ).pack(anchor="w")
 
+        # License line (clickable)
+        license_lbl = tk.Label(
+            msg_win,
+            text="License: MIT",
+            justify="left",
+            bg=bg,
+            fg=fg,
+            font=("Segoe UI", 9),
+            padx=20,
+            wraplength=680,
+            cursor="hand2",
+        )
+        license_lbl.pack(anchor="w", pady=(0, 8))
+        license_lbl.bind("<Button-1>", lambda _e: webbrowser.open_new(LICENSE_URL))
+
+        # Buttons (anchored to bottom so they stay visible)
+        btn_row = tk.Frame(msg_win, bg=bg)
+        btn_row.pack(side="bottom", fill="x", pady=12, padx=16)
+
         ctk.CTkButton(
-            master=msg_win,
+            master=btn_row,
             text="Open GitHub",
-            command=lambda: webbrowser.open_new(
-                "https://github.com/br-automation-community/as6-migration-tools"
-            ),
+            command=lambda: webbrowser.open_new(GITHUB_URL),
             fg_color=B_R_BLUE,
             hover_color=HOVER_BLUE,
             font=BUTTON_FONT,
             width=160,
             height=36,
             corner_radius=8,
-        ).pack(pady=(0, 20))
+        ).pack(side="left")
+
+        ctk.CTkButton(
+            master=btn_row,
+            text="Releases",
+            command=lambda: webbrowser.open_new(RELEASES_URL),
+            fg_color="#444444",
+            hover_color="#555555",
+            font=BUTTON_FONT,
+            width=160,
+            height=36,
+            corner_radius=8,
+        ).pack(side="right", padx=(8, 0))
+
+        ctk.CTkButton(
+            master=btn_row,
+            text="Report an issue",
+            command=lambda: webbrowser.open_new(ISSUES_URL),
+            fg_color="#444444",
+            hover_color="#555555",
+            font=BUTTON_FONT,
+            width=160,
+            height=36,
+            corner_radius=8,
+        ).pack(side="right")
+
+        # --- Center & autosize AFTER layout ---
+        msg_win.update_idletasks()
+        req_w, req_h = msg_win.winfo_reqwidth(), msg_win.winfo_reqheight()
+        screen_h = self.root.winfo_screenheight()
+        max_h = min(int(screen_h * 0.8), 700)  # clamp to 80% of screen or 700 px
+        w = max(720, req_w)  # keep your desired min width
+        h = min(max(360, req_h), max_h)  # min 360, but allow growth up to clamp
+
+        x = self.root.winfo_rootx() + (self.root.winfo_width() // 2) - (w // 2)
+        y = self.root.winfo_rooty() + (self.root.winfo_height() // 2) - (h // 2)
+        msg_win.geometry(f"{w}x{h}+{x}+{y}")
 
         msg_win.transient(self.root)
         msg_win.grab_set()
@@ -1045,13 +1109,14 @@ class ModernMigrationGUI:
         # Do not show if window already destroyed
         if not hasattr(self, "root"):
             return
+
         appearance = ctk.get_appearance_mode()
         bg = "#f0f0f0" if appearance == "Light" else "#2a2d2e"
         fg = "#000000" if appearance == "Light" else "#ffffff"
 
         win = tk.Toplevel(self.root)
         win.withdraw()
-        win.title("Update Available")
+        win.title("Update available")
         win.configure(bg=bg)
         win.geometry("720x420")
         win.resizable(False, False)
@@ -1068,91 +1133,116 @@ class ModernMigrationGUI:
         raw_body = info.get("body", "") or ""
         body = raw_body.strip()[:4000]
 
-        # Header
-        tk.Label(win, text=f"New Version: {tag}", font=LABEL_FONT, bg=bg, fg=fg).pack(
-            pady=(10, 4), anchor="w", padx=16
-        )
+        # Header (keep it simple and consistent)
+        tk.Label(
+            win, text=f"New version available: {tag}", font=LABEL_FONT, bg=bg, fg=fg
+        ).pack(pady=(10, 4), anchor="w", padx=16)
 
-        # Add changelog
+        # Compute changelog text
         current_version = utils.get_version()
         new_version = tag.replace("v", "") if tag else ""
-
         changelog = body
         if current_version != "dev":
             changelog_info = get_changelog_between_versions(
                 current_version, new_version
             )
-            if changelog_info["success"]:
-                changelog = changelog_info["changelog"]
+            if changelog_info.get("success"):
+                changelog = changelog_info.get("changelog") or changelog
 
-        # Scrollable release notes (use CTkTextbox if available; else fallback to tk.Text)
+        # "What's new"
+        tk.Label(
+            win, text="What's new", font=("Segoe UI", 10, "bold"), bg=bg, fg=fg
+        ).pack(pady=(0, 4), anchor="w", padx=16)
+
+        # Scrollable notes with a visible scrollbar (CTk if available; else ttk)
         text_frame = tk.Frame(win, bg=bg)
         text_frame.pack(fill="both", expand=True, padx=16)
-        notes = tk.Text(
-            text_frame,
-            wrap="word",
-            height=10,
-            bg=bg,
-            fg=fg,
-            relief="flat",
-            borderwidth=0,
-        )
+
+        # Use grid to make the textbox and scrollbar resize nicely
+        text_frame.grid_columnconfigure(0, weight=1)
+        text_frame.grid_rowconfigure(0, weight=1)
+
+        try:
+            # Preferred: CTkTextbox + CTkScrollbar for consistent theming
+            notes = ctk.CTkTextbox(text_frame, wrap="word")
+            notes.grid(row=0, column=0, sticky="nsew")
+            sb = ctk.CTkScrollbar(text_frame, command=notes.yview)
+            sb.grid(row=0, column=1, sticky="ns", padx=(6, 0))
+            notes.configure(yscrollcommand=sb.set)
+        except Exception:
+            # Fallback: tk.Text + ttk.Scrollbar
+            notes = tk.Text(
+                text_frame,
+                wrap="word",
+                bg=bg,
+                fg=fg,
+                relief="flat",
+                borderwidth=0,
+            )
+            notes.grid(row=0, column=0, sticky="nsew")
+            sb = ttk.Scrollbar(text_frame, orient="vertical", command=notes.yview)
+            sb.grid(row=0, column=1, sticky="ns", padx=(6, 0))
+            notes.configure(yscrollcommand=sb.set)
+
         notes.insert("1.0", changelog or "(No release notes)")
         notes.configure(state="disabled")
-        notes.pack(fill="both", expand=True)
-
-        # Ignore checkbox
-        ignore_var = tk.BooleanVar(value=False)
-        chk = tk.Checkbutton(
-            win,
-            text="Ignore this version",
-            variable=ignore_var,
-            bg=bg,
-            fg=fg,
-            activebackground=bg,
-            activeforeground=fg,
-            selectcolor=bg,
-        )
-        chk.pack(anchor="w", padx=16, pady=(6, 0))
 
         # Button row
         btn_row = tk.Frame(win, bg=bg)
-        btn_row.pack(fill="x", pady=14, padx=16)
+        # Anchor buttons at the bottom so they stay visible
+        btn_row.pack(side="bottom", fill="x", pady=12, padx=16)
 
-        def open_release():
+        def ignore_version():
+            try:
+                from update_check import set_ignored_version
+
+                set_ignored_version(tag)
+            except Exception:
+                pass
+            win.destroy()
+
+        def get_version():
             if url:
                 webbrowser.open_new(url)
             win.destroy()
 
         def later():
-            if ignore_var.get():
-                try:
-                    from update_check import set_ignored_version
-
-                    set_ignored_version(tag)
-                except Exception:
-                    pass
             win.destroy()
 
         ctk.CTkButton(
             btn_row,
-            text="Open Release",
-            command=open_release,
+            text="Skip this version",
+            command=ignore_version,
+            fg_color="#444444",
+            hover_color="#555555",
+            font=BUTTON_FONT,
+            width=160,
+            height=36,
+            corner_radius=8,
+        ).pack(side="left")
+
+        ctk.CTkButton(
+            btn_row,
+            text="Open release page",
+            command=get_version,
             fg_color=B_R_BLUE,
             hover_color=HOVER_BLUE,
             font=BUTTON_FONT,
             width=160,
             height=36,
             corner_radius=8,
-        ).pack(side="left")
+        ).pack(
+            side="right", padx=(8, 0)
+        )  # spacing to the left
+
         ctk.CTkButton(
             btn_row,
-            text="Later",
+            text="Remind me later",
             command=later,
             fg_color="#444444",
             hover_color="#555555",
             font=BUTTON_FONT,
-            width=120,
+            width=160,
             height=36,
             corner_radius=8,
         ).pack(side="right")
