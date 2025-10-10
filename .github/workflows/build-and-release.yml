@@ -85,7 +85,7 @@ jobs:
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
   release:
-    needs: [build, prepare]
+    needs: [ build, prepare ]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -110,6 +110,72 @@ jobs:
           name: release-artifacts
           path: release
 
+      # === Minimal commit messages (since last release)" line ===
+      - name: Generate commit messages since last release
+        id: notes
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            // Identify repository
+            const owner = context.repo.owner;
+            const repo  = context.repo.repo;
+
+            // Base = latest non-draft, non-prerelease release tag
+            let baseTag = null;
+            try {
+              const last = await github.rest.repos.getLatestRelease({ owner, repo });
+              baseTag = last.data.tag_name; // e.g. v2025.10.08.0930
+              core.info(`Previous release: ${baseTag}`);
+            } catch {
+              core.info('No previous release found (initial release).');
+            }
+
+            // Head = the commit we built (squash-merge on main)
+            const head = `${{ needs.build.outputs.built_sha }}`;
+
+            let md = '#### Changelog:\n\n';
+            if (!baseTag) {
+              md += 'Initial release.\n';
+            } else {
+              const cmp = await github.rest.repos.compareCommitsWithBasehead({
+                owner, repo, basehead: `${baseTag}...${head}`
+              });
+
+              // Map to single-line commit subjects
+              const lines = (cmp.data.commits || []).map(c => {
+                const sha   = c.sha.substring(0,7);
+                let title   = (c.commit.message || '').split('\n')[0];
+                if (title.length > 120) title = title.slice(0,117) + '...';
+                return `[${sha}] ${title}`;
+              });
+
+              md += (lines.length ? lines.join('\n') : 'No commits') + '\n';
+            }
+
+            core.setOutput('markdown', md);
+
+      # Save the markdown as an artifact (heredoc preserves formatting)
+      - name: Save changelog artifact
+        shell: bash
+        run: |
+          cat > release-notes.md <<'EOF'
+          ${{ steps.notes.outputs.markdown }}
+          EOF
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: release-notes.md
+
+      # Generate a SHA-256 checksum for the release ZIP
+      - name: Generate checksum for the ZIP
+        shell: bash
+        run: |
+          cd release
+          sha256sum as6-migration-tools.zip > as6-migration-tools.zip.sha256
+          cat as6-migration-tools.zip.sha256
+
       - name: Create GitHub Release (CalVer tag)
         uses: softprops/action-gh-release@v2
         with:
@@ -118,11 +184,16 @@ jobs:
           name: "AS6 Migration Tools ${{ needs.prepare.outputs.version_ui }}" # 2025.08.27.1109+gabc1234
           make_latest: true
           prerelease: false
+          generate_release_notes: false
           body: |
             ✅ This release contains:
             - The latest GUI tool (`as6-migration-tools.zip`)
+            - SHA-256 checksum file (`as6-migration-tools.zip.sha256`) to verify the ZIP
             - Auto-generated source archives by GitHub (see "Source code" links)
+
+            ${{ steps.notes.outputs.markdown }}
           files: |
             release/as6-migration-tools.zip
+            release/as6-migration-tools.zip.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
