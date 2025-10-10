@@ -394,5 +394,9 @@
   "8F1I01.AA66.xxxx-1": {
     "prefix": "br_web",
     "url": "products/mechatronic-systems/acopostrak/segments/"
+  },
+  "community/VC4": {
+    "prefix": "community",
+    "url": "t/vc4-version-6-1-visapi-needs-more-stack/8352"
   }
 }

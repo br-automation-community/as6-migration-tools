@@ -278,6 +278,7 @@ def load_file_info(folder, filename):
 def build_web_path(links, url):
     path_web = "https://www.br-automation.com/en"
     path_help = "https://help.br-automation.com/#/en/6"
+    path_community = "https://community.br-automation.com/"
 
     # Direct check for external links
     if "http" in url or "https" in url:
@@ -291,6 +292,7 @@ def build_web_path(links, url):
         prefix_paths = {
             "br_web": f"{path_web}/",
             "online_help": f"{path_help}/",
+            "community": f"{path_community}/",
             "mapp_view_license": f"{path_web}/products/software/mapp-technology/mapp-view/mapp-view-licensing/",
             "mapp_view_widget": f"{path_help}/visualization/mappview/widgets/",
             "mapp_view_help": f"{path_help}/visualization/mappview/",

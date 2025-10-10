@@ -14,3 +14,4 @@ from .mapp_vision import check_vision_settings
 from .opc_ua import check_uad_files
 from .safety_check import check_safety
 from .scene_viewer import check_scene_viewer
+from .visual_components_check import check_visual_components
