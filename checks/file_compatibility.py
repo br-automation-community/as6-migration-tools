@@ -1,10 +1,9 @@
 import re
-
-from lxml import etree
 from pathlib import Path
 
-from utils import utils
+from lxml import etree
 
+from utils import utils
 
 version_pattern = re.compile(r'AutomationStudio (?:Working)?Version="?([\d.]+)')
 
@@ -13,14 +12,14 @@ def check_file_version(file_path):
     """
     Checks the version of a given file
     """
-    required_version_prefix = "4.12"
+    accepted_prefixes = ("4.12", "6.")
 
     result = set()
     content = utils.read_file(Path(file_path))
     version_match = version_pattern.search(content)
     if version_match:
-        version = version_match.group(1)
-        if not version.startswith(required_version_prefix):
+        version = version_match.group(1).strip()
+        if not version.startswith(accepted_prefixes):
             result.add((file_path, version))
     else:
         result.add((file_path, "Version Unknown"))
