@@ -1,12 +1,17 @@
-from lxml import etree
 from pathlib import Path
 
+from lxml import etree
+
 from utils import utils
+
+XML_PARSER = etree.XMLParser(
+    recover=True, ns_clean=True, remove_blank_text=True, huge_tree=True
+)
 
 
 def check_visual_components(apj_path: Path, log, verbose: bool = False):
     """
-    Check for the use of VA_Textout and VA_wsTextout functions.
+    Check for the use of VA_Textout and VA_wcTextout functions.
     """
 
     log("─" * 80 + "\nChecking Visual components usage...")
@@ -35,20 +40,20 @@ def check_vc4(logical_path: Path, log, verbose: bool):
         output = ""
         for function, files in found.items():
             paths = "\n".join(
-                f"- {Path(f).relative_to(logical_path.parent)}" for f in files
+                f"- {Path(f).relative_to(logical_path.parent)}" for f in sorted(files)
             )
             output += f"\n\n{function} found in {len(files)} file(s):\n{paths}"
 
         log(
-            "VA_Textout or VA_wsTextout functions found"
-            "\n - VA_Textout and VA_wsTextout needs increased stack in task class."
+            "VA_Textout or VA_wcTextout functions found"
+            "\n - VA_Textout and VA_wcTextout need increased stack in the task class."
             "\n - More info: community/VC4"
             "\n" + output,
             when="AS6",
             severity="WARNING",
         )
     elif verbose:
-        log("No VA_Textout or VA_wsTextout functions found.")
+        log("No VA_Textout or VA_wcTextout functions found.")
 
 
 def check_vc3(logical_path: Path, log, verbose: bool = False):
@@ -59,7 +64,7 @@ def check_vc3(logical_path: Path, log, verbose: bool = False):
     # Walk through all Package.pkg files in the Logical directory
     for pkg_file in logical_path.rglob("Package.pkg"):
         try:
-            tree = etree.parse(pkg_file)
+            tree = etree.parse(str(pkg_file), parser=XML_PARSER)
             root_element = tree.getroot()
             matches = root_element.xpath(
                 ".//*[local-name()='Object'][@Type='DataObject'][@Language='Vc3']"
