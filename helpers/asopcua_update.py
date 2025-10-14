@@ -76,7 +76,7 @@ def replace_fbs_and_types(file_path: Path, fb_mapping, type_mapping):
         type_replacements += num_replacements
 
     if modified_content != original_content:
-        file_path.write_text(encoding="iso-8859-1")
+        file_path.write_text(modified_content, encoding="iso-8859-1")
 
         new_hash = utils.calculate_file_hash(file_path)
         if original_hash == new_hash:
