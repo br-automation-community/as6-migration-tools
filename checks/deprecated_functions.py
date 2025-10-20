@@ -59,7 +59,7 @@ def check_deprecated_functions(
     # Store the list of files containing deprecated string functions
     deprecated_string_files = check_deprecated_string_functions(
         logical_path,
-        [".st"],
+        [".st", ".ab"],
         deprecated_string_functions,
     )
 
