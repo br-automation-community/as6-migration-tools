@@ -108,31 +108,10 @@ def main():
         utils.log("Operation cancelled. No changes were made.", severity="WARNING")
         return
 
-    function_mapping = {
-        "ftoa": "brsftoa",
-        "atof": "brsatof",
-        "itoa": "brsitoa",
-        "atoi": "brsatoi",
-        "memset": "brsmemset",
-        "memcpy": "brsmemcpy",
-        "memmove": "brsmemmove",
-        "memcmp": "brsmemcmp",
-        "strcat": "brsstrcat",
-        "strlen": "brsstrlen",
-        "strcpy": "brsstrcpy",
-        "strcmp": "brsstrcmp",
-        "wcscat": "brwcscat",
-        "wcschr": "brwcschr",
-        "wcscmp": "brwcscmp",
-        "wcsconv": "brwcsconv",
-        "wcscpy": "brwcscpy",
-        "wcslen": "brwcslen",
-        "wcsncat": "brwcsncat",
-        "wcsncmp": "brwcsncmp",
-        "wcsncpy": "brwcsncpy",
-        "wcsrchr": "brwcsrchr",
-        "wcsset": "brwcsset",
-    }
+    info = utils.load_discontinuation_info("deprecated_string_functions")
+    function_mapping = {}
+    for item in info:
+        function_mapping[item] = f"br{item}" if item.startswith("wcs") else f"brs{item}"
 
     constant_mapping = {
         "U8toUC": "brwU8toUC",
