@@ -52,7 +52,7 @@ def check_deprecated_functions(
     # Store the list of files containing deprecated math functions
     deprecated_math_files = utils.scan_files_parallel(
         logical_path,
-        [".st"],
+        [".st", ".ab"],
         check_deprecated_math_functions,
         deprecated_math_functions,
     )
