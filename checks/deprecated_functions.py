@@ -66,13 +66,11 @@ def check_deprecated_functions(
         )
 
         # Verbose: Print where the deprecated string functions were found only if --verbose is enabled
-        if verbose and deprecated_string_files:
-            log(
-                "Deprecated AsString functions detected in the following files:",
-                severity="INFO",
-            )
+        if verbose:
+            output = "Deprecated AsString functions detected in the following files:"
             for f in deprecated_string_files:
-                log(f"- {f}")
+                output += f"\n- {f}"
+            log(output, severity="INFO")
 
     if deprecated_math_files:
         log(
@@ -84,12 +82,10 @@ def check_deprecated_functions(
 
         # Verbose: Print where the deprecated math functions were found only if --verbose is enabled
         if verbose and deprecated_math_files:
-            log(
-                "Deprecated AsMath functions detected in the following files:",
-                severity="INFO",
-            )
+            output = "Deprecated AsMath functions detected in the following files:"
             for f in deprecated_math_files:
-                log(f"- {f}")
+                output += f"\n- {f}"
+            log(output, severity="INFO")
 
 
 def check_obsolete_functions(
@@ -99,20 +95,18 @@ def check_obsolete_functions(
     invalid_st_c_files=None,
 ):
     if invalid_var_typ_files:
-        log(
-            "The following invalid function blocks were found in .var and .typ files:",
-            severity="WARNING",
+        output = (
+            "The following invalid function blocks were found in .var and .typ files:"
         )
         for block, reason, file_path in invalid_var_typ_files:
-            log(f"- {block}: {reason} (Found in: {file_path})")
+            output += f"\n- {block}: {reason} (Found in: {file_path})"
+        log(output, severity="WARNING")
 
     if invalid_st_c_files:
-        log(
-            "The following invalid functions were found in .st, .c and .cpp files:",
-            severity="WARNING",
-        )
+        output = "The following invalid functions were found in .st, .c and .cpp files:"
         for function, reason, file_path in invalid_st_c_files:
-            log(f"- {function}: {reason} (Found in: {file_path})")
+            output += f"\n- {function}: {reason} (Found in: {file_path})"
+        log(output, severity="WARNING")
 
     if verbose:
         if not any([invalid_var_typ_files, invalid_st_c_files]):
