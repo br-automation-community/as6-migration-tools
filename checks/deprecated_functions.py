@@ -3,50 +3,35 @@ from pathlib import Path
 from utils import utils
 
 
-def check_deprecated_string_functions(root_dir, extensions, deprecated_functions):
+def check_deprecated_string_functions(file: str, deprecated_functions: list):
     """
-    Scans all .st files in the project directory for deprecated string functions.
-
-    Returns:
-        list: A list of file paths where deprecated string functions were found.
+    Scans the given file for deprecated string functions.
     """
-    deprecated_files = []
 
-    for ext in extensions:
-        for path in Path(root_dir).rglob(f"*{ext}"):
-            if path.is_file():
-                content = utils.read_file(path)
-                if any(
-                    re.search(rf"\b{func}\b", content) for func in deprecated_functions
-                ):
-                    deprecated_files.append(str(path))
+    path = Path(file)
+    if path.is_file():
+        content = utils.read_file(path)
+        if any(re.search(rf"\b{func}\b", content) for func in deprecated_functions):
+            return [file]
 
-    return deprecated_files
+    return []
 
 
-def check_deprecated_math_functions(root_dir, extensions, deprecated_functions):
+def check_deprecated_math_functions(file: str, deprecated_functions: list):
     """
-    Scans files for deprecated math function calls.
-
-    Args:
-        root_dir (Path): The root directory to search in.
-        extensions (list): List of file extensions to check.
-        deprecated_functions (set): Set of deprecated math functions.
-
-    Returns:
-        list: A list of file paths where deprecated math functions were found.
+    Scans the given file for deprecated math function calls.
     """
-    deprecated_files = []
+
     # Match function names only when followed by '('
     function_pattern = re.compile(r"\b(" + "|".join(deprecated_functions) + r")\s*\(")
 
-    for path in Path(root_dir).rglob("*"):
-        if path.suffix in extensions and path.is_file():
-            content = utils.read_file(path)
-            if function_pattern.search(content):  # Only matches function calls
-                deprecated_files.append(str(path))
+    path = Path(file)
+    if path.is_file():
+        content = utils.read_file(path)
+        if function_pattern.search(content):  # Only matches function calls
+            return [file]
 
-    return deprecated_files
+    return []
 
 
 def check_deprecated_functions(
@@ -57,34 +42,22 @@ def check_deprecated_functions(
     deprecated_math_functions=None,
 ):
     # Store the list of files containing deprecated string functions
-    deprecated_string_files = check_deprecated_string_functions(
+    deprecated_string_files = utils.scan_files_parallel(
         logical_path,
         [".st", ".ab"],
+        check_deprecated_string_functions,
         deprecated_string_functions,
     )
 
-    # Ensure we have a valid list, even if no deprecated functions are found
-    if not isinstance(deprecated_string_files, list):
-        deprecated_string_files = []  # Fallback to an empty list
-
-    # Boolean flag to indicate whether deprecated string functions were found
-    found_deprecated_string = bool(deprecated_string_files)
-
     # Store the list of files containing deprecated math functions
-    deprecated_math_files = check_deprecated_math_functions(
+    deprecated_math_files = utils.scan_files_parallel(
         logical_path,
-        [".st"],
+        [".st", ".ab"],
+        check_deprecated_math_functions,
         deprecated_math_functions,
     )
 
-    # Ensure we have a valid list, even if no deprecated functions are found
-    if not isinstance(deprecated_math_files, list):
-        deprecated_math_files = []  # Fallback to an empty list
-
-    # Boolean flag to indicate whether deprecated math functions were found
-    found_deprecated_math = bool(deprecated_math_files)
-
-    if found_deprecated_string:
+    if deprecated_string_files:
         log(
             "- Deprecated AsString functions detected in the project: "
             "Consider using the helper asstring_to_asbrstr.py to replace them.",
@@ -93,15 +66,13 @@ def check_deprecated_functions(
         )
 
         # Verbose: Print where the deprecated string functions were found only if --verbose is enabled
-        if verbose and deprecated_string_files:
-            log(
-                "Deprecated AsString functions detected in the following files:",
-                severity="INFO",
-            )
+        if verbose:
+            output = "Deprecated AsString functions detected in the following files:"
             for f in deprecated_string_files:
-                log(f"- {f}")
+                output += f"\n- {f}"
+            log(output, severity="INFO")
 
-    if found_deprecated_math:
+    if deprecated_math_files:
         log(
             "- Deprecated AsMath functions detected in the project: "
             "Consider using the helper asmath_to_asbrmath.py to replace them.",
@@ -111,12 +82,10 @@ def check_deprecated_functions(
 
         # Verbose: Print where the deprecated math functions were found only if --verbose is enabled
         if verbose and deprecated_math_files:
-            log(
-                "Deprecated AsMath functions detected in the following files:",
-                severity="INFO",
-            )
+            output = "Deprecated AsMath functions detected in the following files:"
             for f in deprecated_math_files:
-                log(f"- {f}")
+                output += f"\n- {f}"
+            log(output, severity="INFO")
 
 
 def check_obsolete_functions(
@@ -126,20 +95,18 @@ def check_obsolete_functions(
     invalid_st_c_files=None,
 ):
     if invalid_var_typ_files:
-        log(
-            "The following invalid function blocks were found in .var and .typ files:",
-            severity="WARNING",
+        output = (
+            "The following invalid function blocks were found in .var and .typ files:"
         )
         for block, reason, file_path in invalid_var_typ_files:
-            log(f"- {block}: {reason} (Found in: {file_path})")
+            output += f"\n- {block}: {reason} (Found in: {file_path})"
+        log(output, severity="WARNING")
 
     if invalid_st_c_files:
-        log(
-            "The following invalid functions were found in .st, .c and .cpp files:",
-            severity="WARNING",
-        )
+        output = "The following invalid functions were found in .st, .c and .cpp files:"
         for function, reason, file_path in invalid_st_c_files:
-            log(f"- {function}: {reason} (Found in: {file_path})")
+            output += f"\n- {function}: {reason} (Found in: {file_path})"
+        log(output, severity="WARNING")
 
     if verbose:
         if not any([invalid_var_typ_files, invalid_st_c_files]):
