@@ -33,7 +33,9 @@ def check_mappView(apj_path, log, verbose=False):
                     "\n  MappViewConfiguration->Server Configuration->Startup User: anonymous token"
                     "\n"
                     "\n- Change the following settings in the OPC Client/Server configuration (Configuration View/Connectivity/OpcUaCs/UaCsConfig.uacfg):"
+                    "\n  Click on the two green blocks at the top where it says 'Change Advanced Parameter Visibility'"
                     "\n  ClientServerConfiguration->Security->Authentication->Authentication Methods->Anonymous: Enabled"
+                    "\n  ClientServerConfiguration->Security->Authorization->AnonymousAccess->User Role 1: Everyone"
                     "\n"
                     "\n- Change the following settings in the User role system (Configuration View/AccessAndSecurity/UserRoleSystem/User.user):"
                     '\n  Assign the role "BR_Engineer" to the user "Anonymous". Create that user if it doesn\'t already exist, assign no password.'
