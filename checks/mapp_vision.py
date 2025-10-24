@@ -23,7 +23,11 @@ def check_vision_settings(apj_path, log, verbose=False):
                     severity="INFO",
                 )
                 log(
-                    f"After migrating to AS6 make sure that IP forwarding is activated under the Powerlink interface! (AR/Features_and_changes)",
+                    f"Several security settings will be enforced after the migration:"
+                    "\n"
+                    "\n- After migrating to AS6 make sure that IP forwarding is activated under the Powerlink interface! (AR/Features_and_changes)"
+                    "\n"
+                    "\n- There is no more anonymous access to mappVision applications. Make sure to create users and assign them to the appropriate roles (ex. BR_Engineer) after migrating to AS6.",
                     when="AS6",
                     severity="MANDATORY",
                 )
