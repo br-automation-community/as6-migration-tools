@@ -22,7 +22,7 @@ def check_mappView(apj_path, log, verbose=False):
 
                 log(f"Found usage of mappView (Version: {version})", severity="INFO")
                 log(
-                    f"Several security settings will be enforced after the migration:"
+                    f"Several security settings will be enforced after the migration. While we do recommend to use the new settings for better security, here are the steps to restore the previous behavior:"
                     "\n"
                     "\n- To allow access without a certificate"
                     "\n  Change the following settings in the OPC Client/Server configuration (Configuration View/Connectivity/OpcUaCs/UaCsConfig.uacfg):"
