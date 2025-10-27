@@ -1,32 +1,23 @@
-import os
 from lxml import etree
 from pathlib import Path
 
 
-def check_uad_files(root_dir: Path, log, verbose=False):
+def check_uad_files(root_dir: Path, log, verbose=False) -> None:
     """
-    Checks if .uad files are located in any directory ending with Connectivity/OpcUA.
-    Returns a list of misplaced .uad files.
-
-    Args:
-        root_dir: Root directory of the project.
-        log: Logging function to report issues.
-        verbose: If True, logs additional information.
-
-    Returns:
-        Nothing
+    Checks if .uad files are located in any directory ending with Connectivity/OpcUA
+    and if they have at least file version 9.
+    Also checks hardware files for activation of deprecated OPC UA model 1.
     """
 
     log("─" * 80 + "\nChecking OPC configuration...")
 
     # Find misplaced and old opc ua files
-    required_suffix = os.path.normpath(os.path.join("Connectivity", "OpcUA"))
+    required_suffix = ("Connectivity", "OpcUA")
     misplaced_files = []
     old_version = []
 
     for path in root_dir.rglob("*.uad"):
-        relative_parent = path.parent.relative_to(root_dir)
-        if not str(relative_parent).endswith(str(required_suffix)):
+        if path.parent.parts[-2:] != required_suffix:
             misplaced_files.append(str(path))
 
         try:

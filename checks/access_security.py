@@ -5,9 +5,9 @@ from pathlib import Path
 from utils import utils
 
 
-def process_ansl_authentication(file_path):
+def process_ansl_authentication(file_path: Path) -> list:
     """Return [("AnslAuthentication", file_path)] if Value=\"1\" is present, else []."""
-    content = utils.read_file(Path(file_path))
+    content = utils.read_file(file_path)
     pat = re.compile(
         r'ID\s*=\s*["\']AnslAuthentication["\']\s+[^>]*Value\s*=\s*["\']1["\']',
         re.IGNORECASE,
@@ -15,7 +15,7 @@ def process_ansl_authentication(file_path):
     return [("AnslAuthentication", file_path)] if pat.search(content) else []
 
 
-def _find_user_role_system_dirs_deep(physical_path: Path):
+def _find_user_role_system_dirs_deep(physical_path: Path) -> dict:
     """
     Find all .../AccessAndSecurity/UserRoleSystem anywhere under Physical/.
     Returns: dict[config_name -> list[Path]]

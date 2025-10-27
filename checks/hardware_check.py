@@ -1,23 +1,15 @@
-import os
 import re
 from pathlib import Path
 
 from utils import utils
 
 
-def process_hw_file(file_path, hardware_dict):
+def process_hw_file(file_path: Path, hardware_dict: dict) -> list:
     """
     Processes a .hw file to find unsupported hardware matches.
-
-    Args:
-        file_path (str): Path to the .hw file.
-        hardware_dict (dict): Dictionary of unsupported hardware and their reasons.
-
-    Returns:
-        list: Unique matches found in the file.
     """
     results = set()  # Use a set to store unique matches
-    content = utils.read_file(Path(file_path))
+    content = utils.read_file(file_path)
 
     # Regex to extract the Type value from the <Module> elements
     matches = re.findall(r'<Module [^>]*Type="([^"]+)"', content)
@@ -30,7 +22,7 @@ def process_hw_file(file_path, hardware_dict):
     return list(results)  # Convert back to a list for consistency
 
 
-def check_hardware(physical_path, log, verbose=False):
+def check_hardware(physical_path: Path, log, verbose=False) -> None:
     log("─" * 80 + "\nChecking for invalid hardware...")
 
     unsupported_hardware = utils.load_discontinuation_info("unsupported_hw")
@@ -49,7 +41,7 @@ def check_hardware(physical_path, log, verbose=False):
         )
         grouped_results = {}
         for hardware_id, reason, file_path in hardware_results:
-            config_name = os.path.basename(os.path.dirname(file_path))
+            config_name = file_path.parent.parts[-1]
             grouped_results.setdefault(config_name, set()).add((hardware_id, reason))
 
         for config_name, entries in grouped_results.items():
@@ -74,7 +66,7 @@ def check_hardware(physical_path, log, verbose=False):
             log("No unsupported hardware found in the project.", severity="INFO")
 
 
-def count_hardware(folder: Path):
+def count_hardware(folder: Path) -> dict:
     result = {}
     for file_path in folder.rglob("*.hw"):
         content = utils.read_file(file_path)

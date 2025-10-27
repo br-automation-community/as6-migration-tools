@@ -1,21 +1,20 @@
 import re
-from pathlib import Path
-
 from lxml import etree
+from pathlib import Path
 
 from utils import utils
 
 version_pattern = re.compile(r'AutomationStudio (?:Working)?Version="?([\d.]+)')
 
 
-def check_file_version(file_path):
+def check_file_version(file_path: Path) -> list:
     """
     Checks the version of a given file
     """
     accepted_prefixes = ("4.12", "6.")
 
     result = set()
-    content = utils.read_file(Path(file_path))
+    content = utils.read_file(file_path)
     version_match = version_pattern.search(content)
     if version_match:
         version = version_match.group(1).strip()
@@ -26,15 +25,14 @@ def check_file_version(file_path):
     return list(result)
 
 
-def check_files_for_compatibility(project_path, log, verbose=False):
+def check_files_for_compatibility(project_path: Path, log, verbose=False) -> None:
     """
-    Checks the compatibility of .apj and .hw files within a apj_path.
+    Checks the compatibility of .apj and .hw files within an apj_path.
     Validates that files have a minimum required version.
     Generates warning when files are converted to a new format in AS6 that may break references.
     """
     log("─" * 80 + "\nChecking project and hardware files for compatibility...")
 
-    project_path = Path(project_path)
     physical_path = project_path / "Physical"
 
     results = utils.scan_files_parallel(project_path, [".apj"], check_file_version)

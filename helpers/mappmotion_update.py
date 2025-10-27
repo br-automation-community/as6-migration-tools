@@ -184,11 +184,11 @@ def replace_fbs_and_types(
     return fb_replacements, type_replacements, False
 
 
-def check_for_library(project_path, library_names):
+def check_for_library(project_path: Path, library_names: list):
     """
     Checks if any specified library is used in the project.
     """
-    pkg_file = Path(project_path) / "Logical" / "Libraries" / "Package.pkg"
+    pkg_file = project_path / "Logical" / "Libraries" / "Package.pkg"
     if not pkg_file.is_file():
         utils.log(
             f"Error: Could not find Package.pkg file in: {pkg_file}", severity="ERROR"
@@ -217,7 +217,7 @@ def parse_args():
 
 def main():
     args = parse_args()
-    project_path = args.project_path
+    project_path = Path(args.project_path)
     apj_file = utils.get_and_check_project_file(project_path)
 
     utils.log(f"Project path validated: {project_path}")

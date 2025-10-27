@@ -5,7 +5,7 @@ from pathlib import Path
 from utils import utils
 
 
-def check_scene_viewer(apj_path: Path, log, verbose: bool = False):
+def check_scene_viewer(apj_path: Path, log, verbose: bool = False) -> None:
     """
     Detect whether B&R Scene Viewer is used by the project and, if so,
     inform about the minimum required version and setup steps.

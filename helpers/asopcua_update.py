@@ -8,7 +8,7 @@ from pathlib import Path
 from utils import utils
 
 
-def replace_enums(file_path: Path, enum_mapping):
+def replace_enums(file_path: Path, enum_mapping: dict) -> tuple[int, bool]:
     """
     Replace enumerators in a file based on the provided mappings.
     """
@@ -16,7 +16,7 @@ def replace_enums(file_path: Path, enum_mapping):
         return 0, False
 
     original_hash = utils.calculate_file_hash(file_path)
-    original_content = utils.read_file(Path(file_path))
+    original_content = utils.read_file(file_path)
     modified_content = original_content
     enum_replacements = 0
 
@@ -44,7 +44,9 @@ def replace_enums(file_path: Path, enum_mapping):
     return enum_replacements, False
 
 
-def replace_fbs_and_types(file_path: Path, fb_mapping, type_mapping):
+def replace_fbs_and_types(
+    file_path: Path, fb_mapping: dict, type_mapping: dict
+) -> tuple[int, int, bool]:
     """
     Replace function block calls and types in a file based on the provided mappings.
     """
@@ -52,7 +54,7 @@ def replace_fbs_and_types(file_path: Path, fb_mapping, type_mapping):
         return 0, 0, False
 
     original_hash = utils.calculate_file_hash(file_path)
-    original_content = utils.read_file(Path(file_path))
+    original_content = utils.read_file(file_path)
     modified_content = original_content
     fb_replacements = 0
     type_replacements = 0
