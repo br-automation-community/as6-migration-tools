@@ -136,7 +136,7 @@ def process_var_file(file_path: Path, patterns: dict) -> list:
     """
     Processes a .var file to find matches for obsolete function blocks.
     """
-    results = []
+    results = set()
     content = utils.read_file(file_path)
 
     # Regex for function block declarations, e.g., : MpAlarmXConfigMapping;
@@ -144,15 +144,15 @@ def process_var_file(file_path: Path, patterns: dict) -> list:
     for match in matches:
         for pattern, reason in patterns.items():
             if match.lower() == pattern.lower():
-                results.append((pattern, reason, file_path))
-    return results
+                results.add((pattern, reason, file_path))
+    return list(results)
 
 
 def process_st_c_file(file_path: Path, patterns: dict) -> list:
     """
     Processes a .st, .c, or .cpp file to find matches for the given patterns.
     """
-    results = []
+    results = set()
     content = utils.read_file(file_path)
 
     pattern_map = {p.lower(): (p, reason) for p, reason in patterns.items()}
@@ -160,8 +160,8 @@ def process_st_c_file(file_path: Path, patterns: dict) -> list:
     for match in matches:
         key = match.lower()
         if key in pattern_map:
-            results.append((pattern_map[key][0], pattern_map[key][1], file_path))
-    return results
+            results.add((pattern_map[key][0], pattern_map[key][1], file_path))
+    return list(results)
 
 
 def check_functions(logical_path: Path, log, verbose=False) -> None:
