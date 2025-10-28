@@ -53,9 +53,22 @@ def check_hardware(physical_path, log, verbose=False):
             grouped_results.setdefault(config_name, set()).add((hardware_id, reason))
 
         for config_name, entries in grouped_results.items():
-            log(f"\nHardware configuration: {config_name}")
-            for hardware_id, reason in sorted(entries):
-                log(f"- {hardware_id}: {reason}")
+            hw_list = ", ".join(f"{hw}" for hw, reason in sorted(entries))
+            output = f"Hardware configuration '{config_name}':\n{hw_list}"
+            log(output)
+
+        if verbose:
+            hw_reason_map = {}
+            for hw, reason, _ in hardware_results:
+                if hw not in hw_reason_map:
+                    hw_reason_map[hw] = reason
+            reason_list = "\n".join(
+                f"- {hw}: {reason}" for hw, reason in hw_reason_map.items()
+            )
+            log(
+                f"Summary of unsupported hardware and reasons:\n{reason_list}",
+                severity="INFO",
+            )
     else:
         if verbose:
             log("No unsupported hardware found in the project.", severity="INFO")

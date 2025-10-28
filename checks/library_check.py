@@ -142,25 +142,19 @@ def check_libraries(logical_path, log, verbose=False):
     )
 
     if invalid_pkg_files:
-        log(
-            "The following invalid libraries were found in .pkg files:",
-            when="AS6",
-            severity="MANDATORY",
-        )
+        output = "The following invalid libraries were found in .pkg files:"
         for library, reason, file_path in invalid_pkg_files:
-            log(f"- {library}: {reason} (Found in: {file_path})")
+            output += f"\n- {library}: {reason} (Found in: {file_path})"
+        log(output, when="AS6", severity="MANDATORY")
     else:
         if verbose:
             log("No invalid libraries found in .pkg files.", severity="INFO")
 
     if manual_libs_results:
-        log(
-            "The following libraries might require manual action after migrating the project to Automation Studio 6:",
-            when="AS6",
-            severity="WARNING",
-        )
+        output = "The following libraries might require manual action after migrating the project to Automation Studio 6:"
         for library, reason, file_path in manual_libs_results:
-            log(f"- {library}: {reason} (Found in: {file_path})")
+            output += f"\n- {library}: {reason} (Found in: {file_path})"
+        log(output, when="AS6", severity="WARNING")
     else:
         if verbose:
             log(
@@ -178,13 +172,10 @@ def check_libraries(logical_path, log, verbose=False):
     all_dependency_results = normalized_lby_results + c_include_dependency_results
 
     if all_dependency_results:
-        log(
-            "The following obsolete dependencies were found in .lby, .c, .cpp, and .hpp files:",
-            when="AS6",
-            severity="MANDATORY",
-        )
+        output = "The following obsolete dependencies were found in .lby, .c, .cpp, and .hpp files:"
         for library_name, reason, file_path in all_dependency_results:
-            log(f"- {library_name}: {reason} (Found in: {file_path})")
+            output += f"\n- {library_name}: {reason} (Found in: {file_path})"
+        log(output, when="AS6", severity="MANDATORY")
     else:
         if verbose:
             log(
