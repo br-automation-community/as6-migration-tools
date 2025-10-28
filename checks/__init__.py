@@ -8,7 +8,7 @@ from .hardware_check import check_hardware
 from .library_check import check_libraries
 from .mapp_control import check_mapp_control
 from .mapp_services import check_mapp_version
-from .mapp_view import check_mappView
+from .mapp_view import check_mapp_view
 from .mapp_view_wdk import check_widget_lib_usage
 from .mapp_vision import check_vision_settings
 from .opc_ua import check_uad_files

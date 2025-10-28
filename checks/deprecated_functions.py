@@ -1,23 +1,23 @@
 import re
 from pathlib import Path
+
 from utils import utils
 
 
-def check_deprecated_string_functions(file: str, deprecated_functions: list):
+def check_deprecated_string_functions(path: Path, deprecated_functions: list) -> list:
     """
     Scans the given file for deprecated string functions.
     """
-
-    path = Path(file)
+    results = []
     if path.is_file():
         content = utils.read_file(path)
         if any(re.search(rf"\b{func}\b", content) for func in deprecated_functions):
-            return [file]
+            results.append(path)
 
-    return []
+    return results
 
 
-def check_deprecated_math_functions(file: str, deprecated_functions: list):
+def check_deprecated_math_functions(path: Path, deprecated_functions: list) -> list:
     """
     Scans the given file for deprecated math function calls.
     """
@@ -25,22 +25,23 @@ def check_deprecated_math_functions(file: str, deprecated_functions: list):
     # Match function names only when followed by '('
     function_pattern = re.compile(r"\b(" + "|".join(deprecated_functions) + r")\s*\(")
 
-    path = Path(file)
+    results = []
     if path.is_file():
         content = utils.read_file(path)
         if function_pattern.search(content):  # Only matches function calls
-            return [file]
+            results.append(path)
 
-    return []
+    return results
 
 
-def check_deprecated_functions(
-    logical_path,
-    log,
-    verbose=False,
-    deprecated_string_functions=None,
-    deprecated_math_functions=None,
-):
+def check_deprecated_functions(logical_path, log, verbose=False) -> None:
+    deprecated_string_functions = utils.load_discontinuation_info(
+        "deprecated_string_functions"
+    )
+    deprecated_math_functions = utils.load_discontinuation_info(
+        "deprecated_math_functions"
+    )
+
     # Store the list of files containing deprecated string functions
     deprecated_string_files = utils.scan_files_parallel(
         logical_path,
@@ -89,11 +90,26 @@ def check_deprecated_functions(
 
 
 def check_obsolete_functions(
+    logical_path: Path,
     log,
     verbose=False,
-    invalid_var_typ_files=None,
-    invalid_st_c_files=None,
-):
+) -> None:
+    obsolete_function_blocks = utils.load_discontinuation_info("obsolete_fbks")
+    invalid_var_typ_files = utils.scan_files_parallel(
+        logical_path,
+        [".var", ".typ"],
+        process_var_file,
+        obsolete_function_blocks,
+    )
+
+    obsolete_functions = utils.load_discontinuation_info("obsolete_funcs")
+    invalid_st_c_files = utils.scan_files_parallel(
+        logical_path,
+        [".st", ".c", ".cpp"],
+        process_st_c_file,
+        obsolete_functions,
+    )
+
     if invalid_var_typ_files:
         output = (
             "The following invalid function blocks were found in .var and .typ files:"
@@ -116,19 +132,12 @@ def check_obsolete_functions(
             )
 
 
-def process_var_file(file_path, patterns):
+def process_var_file(file_path: Path, patterns: dict) -> list:
     """
     Processes a .var file to find matches for obsolete function blocks.
-
-    Args:
-        file_path (str): Path to the .var file.
-        patterns (dict): Patterns to match with reasons.
-
-    Returns:
-        list: Matches found in the file.
     """
     results = []
-    content = utils.read_file(Path(file_path))
+    content = utils.read_file(file_path)
 
     # Regex for function block declarations, e.g., : MpAlarmXConfigMapping;
     matches = re.findall(r":\s*([A-Za-z0-9_]+)\s*;", content)
@@ -139,19 +148,12 @@ def process_var_file(file_path, patterns):
     return results
 
 
-def process_st_c_file(file_path, patterns):
+def process_st_c_file(file_path: Path, patterns: dict) -> list:
     """
     Processes a .st, .c, or .cpp file to find matches for the given patterns.
-
-    Args:
-        file_path (str): Path to the file.
-        patterns (dict): Patterns to match with reasons.
-
-    Returns:
-        list: Matches found in the file.
     """
     results = []
-    content = utils.read_file(Path(file_path))
+    content = utils.read_file(file_path)
 
     pattern_map = {p.lower(): (p, reason) for p, reason in patterns.items()}
     matches = re.findall(r"\b([A-Za-z0-9_]+)\b", content)
@@ -162,37 +164,9 @@ def process_st_c_file(file_path, patterns):
     return results
 
 
-def check_functions(logical_path, log, verbose=False):
+def check_functions(logical_path: Path, log, verbose=False) -> None:
     log("─" * 80 + "\nChecking for obsolete and deprecated FUBs and functions...")
 
-    obsolete_function_blocks = utils.load_discontinuation_info("obsolete_fbks")
-    invalid_var_typ_files = utils.scan_files_parallel(
-        logical_path,
-        [".var", ".typ"],
-        process_var_file,
-        obsolete_function_blocks,
-    )
+    check_obsolete_functions(logical_path, log, verbose)
 
-    obsolete_functions = utils.load_discontinuation_info("obsolete_funcs")
-    invalid_st_c_files = utils.scan_files_parallel(
-        logical_path,
-        [".st", ".c", ".cpp"],
-        process_st_c_file,
-        obsolete_functions,
-    )
-
-    check_obsolete_functions(log, verbose, invalid_var_typ_files, invalid_st_c_files)
-
-    deprecated_string_functions = utils.load_discontinuation_info(
-        "deprecated_string_functions"
-    )
-    deprecated_math_functions = utils.load_discontinuation_info(
-        "deprecated_math_functions"
-    )
-    check_deprecated_functions(
-        logical_path,
-        log,
-        verbose,
-        deprecated_string_functions,
-        deprecated_math_functions,
-    )
+    check_deprecated_functions(logical_path, log, verbose)

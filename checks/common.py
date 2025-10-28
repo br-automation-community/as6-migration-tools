@@ -1,7 +1,5 @@
 import re
 
-from utils import utils
-
 
 # Check the project name and path for invalid characters
 # As opposed to what's in the help, we need to allow : and \ and / as well since these are valid

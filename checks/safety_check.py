@@ -1,11 +1,11 @@
 import re
-
 from lxml import etree
+from pathlib import Path
 
 from utils import utils
 
 
-def check_safety_release(apj_path, log, verbose=False):
+def check_safety_release(apj_path: Path, log, verbose=False) -> bool:
     """
     Checks if the project uses MappSafety or SafetyRelease.
     """
@@ -56,10 +56,10 @@ def check_safety_release(apj_path, log, verbose=False):
     return False
 
 
-def check_safety(apj_path, log, verbose=False):
+def check_safety(apj_path: Path, log, verbose=False) -> None:
     """
     Args:
-        project_root: path of the project
+        apj_path: path of the project file
 
     Returns:
         Nothing
@@ -68,7 +68,6 @@ def check_safety(apj_path, log, verbose=False):
     log("─" * 80 + "\nChecking for safety...")
 
     found = check_safety_release(apj_path, log, verbose)
-    findings = []
 
     if not found:
         log("No safety system detected", severity="INFO")

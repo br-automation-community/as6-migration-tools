@@ -1,16 +1,9 @@
 import requests
 
 
-def get_changelog_between_versions(old_version, new_version):
+def get_changelog_between_versions(old_version: str, new_version: str) -> dict:
     """
     Get changelog between two versions using GitHub API.
-
-    Args:
-        old_version: Current version of user (e.g. "2025.10.06.1035")
-        new_version: Newest Githhub release version (e.g. "2025.10.09.1509")
-
-    Returns:
-        dict: {"success": bool, "changelog": str, "commit_count": int, "error": str}
     """
     url = f"https://api.github.com/repos/br-automation-community/as6-migration-tools/compare/v{old_version}...v{new_version}"
 

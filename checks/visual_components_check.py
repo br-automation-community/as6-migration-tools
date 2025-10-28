@@ -1,6 +1,5 @@
-from pathlib import Path
-
 from lxml import etree
+from pathlib import Path
 
 from utils import utils
 
@@ -22,7 +21,7 @@ def check_visual_components(apj_path: Path, log, verbose: bool = False):
     check_vc4(logical_path, log, verbose)
 
 
-def check_vc4(logical_path: Path, log, verbose: bool):
+def check_vc4(logical_path: Path, log, verbose: bool) -> None:
     """
     Check for used VC4 functions that require increased stack size.
     """
@@ -56,7 +55,7 @@ def check_vc4(logical_path: Path, log, verbose: bool):
         log("No VA_Textout or VA_wcTextout functions found.")
 
 
-def check_vc3(logical_path: Path, log, verbose: bool = False):
+def check_vc3(logical_path: Path, log, verbose: bool = False) -> None:
     """
     Check for VC3 usage in the project.
     """
@@ -85,8 +84,8 @@ def check_vc3(logical_path: Path, log, verbose: bool = False):
             continue
 
 
-def find_stack_functions(file_path: str):
-    content = utils.read_file(Path(file_path))
+def find_stack_functions(file_path: Path) -> list:
+    content = utils.read_file(file_path)
 
     found = set()
     methods = ["VA_Textout", "VA_wcTextout"]

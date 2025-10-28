@@ -1,21 +1,16 @@
-import os
 import re
 from pathlib import Path
 
 from utils import utils
 
 
-def process_file_devices(file_path):
+def process_file_devices(file_path: Path) -> list:
     """
-    Args:
-        file_path: Path to the .hw file.
-
-    Returns:
-        list: Unique matches found in the file.
+    Checks for used file devices that access system partitions.
     """
     exclude = ["C:\\", "D:\\", "E:\\", "F:\\"]
     results = set()  # Use a set to store unique matches
-    content = utils.read_file(Path(file_path))
+    content = utils.read_file(file_path)
 
     # Regex to extract the value from the file device elements
     matches = re.findall(
@@ -29,16 +24,12 @@ def process_file_devices(file_path):
     return list(results)  # Convert back to a list for consistency
 
 
-def process_ftp_configurations(file_path):
+def process_ftp_configurations(file_path: Path) -> list:
     """
-    Args:
-        file_path: Path to the .hw file.
-
-    Returns:
-        list: Unique matches found in the file.
+    Checks for FTP configurations that access the SYSTEM partition.
     """
     results = set()
-    content = utils.read_file(Path(file_path))
+    content = utils.read_file(file_path)
 
     # Regex to extract if the FTP server is activated
     matches = re.search(r'<Parameter ID="ActivateFtpServer"\s+Value="(\d)" />', content)
@@ -53,7 +44,7 @@ def process_ftp_configurations(file_path):
     return list(results)  # Convert back to a list for consistency
 
 
-def check_file_devices(physical_path, log, verbose=False):
+def check_file_devices(physical_path: Path, log, verbose=False) -> None:
     log("─" * 80 + "\nChecking for invalid file devices and ftp configurations...")
 
     results = utils.scan_files_parallel(
@@ -70,7 +61,7 @@ def check_file_devices(physical_path, log, verbose=False):
         )
         grouped_results = {}
         for name, path, file_path in file_devices:
-            config_name = os.path.basename(os.path.dirname(file_path))
+            config_name = file_path.parent.parts[-1]
             grouped_results.setdefault(config_name, set()).add((name, path))
 
         output = ""
@@ -102,7 +93,7 @@ def check_file_devices(physical_path, log, verbose=False):
         )
         grouped_results = {}
         for name, file_path in ftp_configs:
-            config_name = os.path.basename(os.path.dirname(file_path))
+            config_name = file_path.parent.parts[-1]
             grouped_results.setdefault(config_name, set()).add(name)
 
         for config_name, entries in grouped_results.items():

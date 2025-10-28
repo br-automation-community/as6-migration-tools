@@ -242,7 +242,7 @@ def scan_files_parallel(
 
     files = []
     for ext in extensions:
-        files.extend(str(p) for p in root_dir.rglob(f"*{ext}") if p.is_file())
+        files.extend(p for p in root_dir.rglob(f"*{ext}") if p.is_file())
 
     def process_file(path):
         return {func.__name__: func(path, *args) for func in process_functions}

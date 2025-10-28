@@ -7,8 +7,8 @@ from utils import utils
 
 
 def replace_functions_and_constants(
-    file_path: Path, function_mapping, constant_mapping
-):
+    file_path: Path, function_mapping: dict, constant_mapping: dict
+) -> tuple[int, int, bool]:
     """
     Replace function calls and constants in a file based on the provided mappings.
     """
@@ -50,11 +50,11 @@ def replace_functions_and_constants(
     return function_replacements, constant_replacements, False
 
 
-def check_for_asmath_library(project_path):
+def check_for_asmath_library(project_path: Path) -> bool:
     """
     Checks if AsMath library is used in the project.
     """
-    pkg_file = Path(project_path) / "Logical" / "Libraries" / "Package.pkg"
+    pkg_file = project_path / "Logical" / "Libraries" / "Package.pkg"
     if not pkg_file.is_file():
         return False
 
@@ -74,6 +74,7 @@ def main():
     project_path = sys.argv[1] if len(sys.argv) > 1 else os.getcwd()
 
     apj_file = utils.get_and_check_project_file(project_path)
+    project_path = Path(project_path)
 
     utils.log(f"Project path validated: {project_path}")
     utils.log(f"Using project file: {apj_file}\n")

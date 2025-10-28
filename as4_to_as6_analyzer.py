@@ -116,12 +116,13 @@ def main():
         check_project_path_and_name(args.project_path, apj_file, log, args.verbose)
 
         # Resolve key paths
-        apj_path = Path(args.project_path) / apj_file
-        logical_path = Path(args.project_path) / "Logical"
-        physical_path = Path(args.project_path) / "Physical"
+        project_path = Path(args.project_path)
+        apj_path = project_path / apj_file
+        logical_path = project_path / "Logical"
+        physical_path = project_path / "Physical"
 
         # Generic file compatibility checks
-        check_files_for_compatibility(args.project_path, log, args.verbose)
+        check_files_for_compatibility(project_path, log, args.verbose)
 
         # Hardware & configuration checks
         check_ar(physical_path, log, args.verbose)
@@ -139,7 +140,7 @@ def main():
         # Special-domain checks
         check_safety(apj_path, log, args.verbose)  # Safety system issues
         check_vision_settings(apj_path, log, args.verbose)  # mappVision issues
-        check_mappView(apj_path, log, args.verbose)  # mappView issues
+        check_mapp_view(apj_path, log, args.verbose)  # mappView issues
         check_widget_lib_usage(
             logical_path, log, args.verbose
         )  # Detect widget libraries (WDK usage or User Widget Libraries from AS4)

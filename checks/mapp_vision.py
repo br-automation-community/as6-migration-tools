@@ -1,9 +1,10 @@
 import re
+from pathlib import Path
 
 from utils import utils
 
 
-def check_vision_settings(apj_path, log, verbose=False):
+def check_vision_settings(apj_path: Path, log, verbose=False) -> None:
     """
     Checks for the presence of mappVision settings files in the specified directory.
     """

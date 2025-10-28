@@ -7,21 +7,17 @@ from utils import utils
 
 
 def replace_functions_and_constants(
-    file_path: Path, function_mapping, constant_mapping
-):
+    file_path: Path, function_mapping: dict, constant_mapping: dict
+) -> tuple[int, int, bool]:
     """
     Replace function calls and constants in a file based on the provided mappings.
     """
-    original_hash = utils.calculate_file_hash(str(file_path))
+    original_hash = utils.calculate_file_hash(file_path)
     original_content = utils.read_file(file_path)
 
     modified_content = original_content
     function_replacements = 0
     constant_replacements = 0
-
-    # if file_path.endswith('ncsdcctrlInit.st'):
-    #     modified_content, num_replacements = re.subn(r'(\s*)((?:strcpy)|(?:strcat))', r'\1brs\2', original_content)
-    #     pass
 
     # Replace function calls
     for old_func, new_func in function_mapping.items():
@@ -45,7 +41,7 @@ def replace_functions_and_constants(
     if modified_content != original_content:
         file_path.write_text(modified_content, encoding="iso-8859-1")
 
-        new_hash = utils.calculate_file_hash(str(file_path))
+        new_hash = utils.calculate_file_hash(file_path)
         if original_hash == new_hash:
             return function_replacements, constant_replacements, False
 
@@ -58,11 +54,10 @@ def replace_functions_and_constants(
     return function_replacements, constant_replacements, False
 
 
-def check_for_library(project_path, library_names):
+def check_for_library(project_path: Path, library_names: list) -> list:
     """
     Checks if any specified library is used in the project.
     """
-    project_path = Path(project_path)
     pkg_file = project_path / "Logical" / "Libraries" / "Package.pkg"
     if not pkg_file.is_file():
         utils.log(f"Could not find Package.pkg file in: {pkg_file}", severity="ERROR")
@@ -73,7 +68,7 @@ def check_for_library(project_path, library_names):
 
 
 def main():
-    project_path = sys.argv[1] if len(sys.argv) > 1 else os.getcwd()
+    project_path = Path(sys.argv[1] if len(sys.argv) > 1 else os.getcwd())
     apj_file = utils.get_and_check_project_file(project_path)
 
     utils.log(f"Project path validated: {project_path}")
@@ -118,13 +113,13 @@ def main():
         "UCtoU8": "brwUCtoU8",
     }
 
-    logical_path = Path(project_path) / "Logical"
+    logical_path = project_path / "Logical"
     total_function_replacements = 0
     total_constant_replacements = 0
     total_files_changed = 0
 
     # Loop through the files in the "Logical" directory and process .st and .ab files
-    for file_path in Path(logical_path).rglob("*"):
+    for file_path in logical_path.rglob("*"):
         if file_path.suffix in {".st", ".ab"}:
             function_replacements, constant_replacements, changed = (
                 replace_functions_and_constants(

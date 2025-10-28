@@ -210,7 +210,7 @@ def check_mapp_vision(mapp_vision) -> list:
 
 
 def main():
-    project_path = sys.argv[1] if len(sys.argv) > 1 else os.getcwd()
+    project_path = Path(sys.argv[1] if len(sys.argv) > 1 else os.getcwd())
     apj_file = utils.get_and_check_project_file(project_path)
 
     utils.log(f"Project path validated: {project_path}")
@@ -236,7 +236,7 @@ def main():
         severity="INFO",
     )
 
-    analyse = ma.mapp_license_analyzer(Path(project_path))
+    analyse = ma.mapp_license_analyzer(project_path)
 
     # reporting is done here
     total_licenses = []

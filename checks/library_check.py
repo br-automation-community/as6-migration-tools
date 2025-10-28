@@ -1,23 +1,15 @@
-import os
 import re
 from pathlib import Path
 
 from utils import utils
 
 
-def process_pkg_file(file_path, patterns):
+def process_pkg_file(file_path: Path, patterns: dict) -> list:
     """
     Processes a .pkg file to find matches for obsolete libraries.
-
-    Args:
-        file_path (str): Path to the .pkg file.
-        patterns (dict): Patterns to match with reasons.
-
-    Returns:
-        list: Matches found in the file.
     """
     results = []
-    content = utils.read_file(Path(file_path))
+    content = utils.read_file(file_path)
 
     # Regex for library names between > and <
     matches = re.findall(r">([^<]+)<", content, re.IGNORECASE)
@@ -25,29 +17,22 @@ def process_pkg_file(file_path, patterns):
         for pattern, reason in patterns.items():
             if match.lower() == pattern.lower():
                 # if we find a match, check if we can find a matching *.lby file in the subdir
-                pkg_path = Path(file_path).parent / pattern
+                pkg_path = file_path.parent / pattern
                 is_lib = any(pkg_path.rglob("*.lby"))
                 if is_lib:
                     results.append((pattern, reason, file_path))
     return results
 
 
-def process_lby_file(file_path, patterns):
+def process_lby_file(file_path: Path, patterns: dict) -> list:
     """
     Processes a .lby file to find obsolete dependencies.
-
-    Args:
-        file_path (str): Path to the .lby file.
-        patterns (dict): Patterns of obsolete dependencies with reasons.
-
-    Returns:
-        list: Matches found in the file in the format (library_name, dependency, reason, file_path).
     """
     results = []
-    content = utils.read_file(Path(file_path))
+    content = utils.read_file(file_path)
 
     # Extract library name (directory name as identifier)
-    library_name = os.path.basename(os.path.dirname(file_path))
+    library_name = file_path.parent.parts[-1]
     # Extract dependencies from the XML content
     dependencies = re.findall(
         r'<Dependency ObjectName="([^"]+)"', content, re.IGNORECASE
@@ -60,20 +45,13 @@ def process_lby_file(file_path, patterns):
     return results
 
 
-def process_c_cpp_hpp_includes_file(file_path, patterns):
+def process_c_cpp_hpp_includes_file(file_path: Path, patterns: dict) -> list:
     """
     Processes a C, C++, or header (.hpp) file to find obsolete dependencies in #include statements.
-
-    Args:
-        file_path (str): Path to the file.
-        patterns (dict): Dictionary of obsolete libraries with reasons.
-
-    Returns:
-        list: Matches found in the file in the format (library_name, reason, file_path).
     """
     results = []
     include_pattern = re.compile(r'#include\s+[<"]([^">]+)[">]')
-    content = utils.read_file(Path(file_path))
+    content = utils.read_file(file_path)
 
     for line in content:
         match = include_pattern.search(line)
@@ -86,19 +64,12 @@ def process_c_cpp_hpp_includes_file(file_path, patterns):
 
 
 # Function to process libraries requiring manual process
-def process_manual_libraries(file_path, patterns):
+def process_manual_libraries(file_path: Path, patterns: dict) -> list:
     """
     Processes .pkg or .lby files to find libraries that require manual action during migration.
-
-    Args:
-        file_path (str): Path to the file.
-        patterns (dict): Libraries to be checked for manual process.
-
-    Returns:
-        list: Matches found in the file.
     """
     results = []
-    content = utils.read_file(Path(file_path))
+    content = utils.read_file(file_path)
 
     matches = re.findall(r">([^<]+)<", content, re.IGNORECASE)
     for match in matches:
