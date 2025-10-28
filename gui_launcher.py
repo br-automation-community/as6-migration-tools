@@ -661,11 +661,12 @@ class ModernMigrationGUI:
             error_message = f"Folder does not exist: {folder}"
         elif not self.is_valid_as4_project(folder):
             error_message = f"Folder is not a valid AS4 project: {folder}"
-        elif not os.path.exists(script):
-            error_message = f"Script not found: {script}"
+        elif not script or not os.path.exists(script):
+            error_message = f"Script not found: {self.selected_script.get()}"
 
         if error_message:
             utils.log(error_message, severity="ERROR")
+            self.update_status("Script execution failed")
             self.spinner_running = False
             return
 
