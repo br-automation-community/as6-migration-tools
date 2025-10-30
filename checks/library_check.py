@@ -45,6 +45,27 @@ def process_lby_file(file_path: Path, patterns: dict) -> list:
     return results
 
 
+def process_binary_lby_file(file_path: Path, patterns: dict) -> list:
+    """
+    Processes a .lby file to find custom binaries binary libraries
+    """
+    results = []
+    content = utils.read_file(file_path)
+
+    # Only consider binary libraries
+    if not re.search(r'SubType\s*=\s*"Binary"', content, re.IGNORECASE):
+        return results
+
+    # Library name = folder name
+    library_name = file_path.parent.parts[-1]
+
+    # Case-insensitive presence check against whitelist
+    if library_name.lower() not in patterns:
+        results.append((library_name, file_path))
+
+    return results
+
+
 def process_c_cpp_hpp_includes_file(file_path: Path, patterns: dict) -> list:
     """
     Processes a C, C++, or header (.hpp) file to find obsolete dependencies in #include statements.
@@ -111,6 +132,37 @@ def check_libraries(logical_path, log, verbose=False):
         process_c_cpp_hpp_includes_file,
         obsolete_dict,
     )
+
+    # Load whitelist from discontinuations/binary_lib_whitelist.json
+    whitelist_raw = utils.load_discontinuation_info("binary_lib_whitelist") or []
+    whitelist_set = {str(x).lower() for x in whitelist_raw}
+    non_whitelisted_binaries = utils.scan_files_parallel(
+        logical_path,
+        [".lby"],
+        process_binary_lby_file,
+        whitelist_set,
+    )
+
+    if non_whitelisted_binaries:
+        # De-duplicate by library name to avoid noisy output
+        seen = set()
+        deduped = []
+        for lib_name, file_path in non_whitelisted_binaries:
+            key = lib_name.lower()
+            if key not in seen:
+                seen.add(key)
+                deduped.append((lib_name, file_path))
+
+        output = (
+            "Potential custom/third-party binaries; make sure you have the source code "
+            "or an AS6 replacement/version:"
+        )
+        for library_name, file_path in deduped:
+            output += f"\n- {library_name} (Found in: {file_path})"
+        log(output, when="AS6", severity="WARNING")
+    else:
+        if verbose:
+            log("No non-whitelisted binary libraries detected.", severity="INFO")
 
     if invalid_pkg_files:
         output = "The following invalid libraries were found in .pkg files:"
