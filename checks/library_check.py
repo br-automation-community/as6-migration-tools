@@ -146,19 +146,15 @@ def check_libraries(logical_path, log, verbose=False):
     if non_whitelisted_binaries:
         # De-duplicate by library name to avoid noisy output
         seen = set()
-        deduped = []
-        for lib_name, file_path in non_whitelisted_binaries:
-            key = lib_name.lower()
-            if key not in seen:
-                seen.add(key)
-                deduped.append((lib_name, file_path))
-
         output = (
             "Potential custom/third-party binaries; make sure you have the source code "
             "or an AS6 replacement/version:"
         )
-        for library_name, file_path in deduped:
-            output += f"\n- {library_name} (Found in: {file_path})"
+        for library_name, file_path in non_whitelisted_binaries:
+            key = library_name.lower()
+            if key not in seen:
+                seen.add(key)
+                output += f"\n- {library_name} (Found in: {file_path})"
         log(output, when="AS6", severity="WARNING")
     else:
         if verbose:
