@@ -4,10 +4,11 @@ from pathlib import Path
 from utils import utils
 
 
-def process_pkg_file(file_path: Path, patterns: dict) -> list:
+def process_pkg_file(file_path: Path, args: dict) -> list:
     """
     Processes a .pkg file to find matches for obsolete libraries.
     """
+    patterns = args["obsolete_dict"]
     results = []
     content = utils.read_file(file_path)
 
@@ -24,10 +25,11 @@ def process_pkg_file(file_path: Path, patterns: dict) -> list:
     return results
 
 
-def process_lby_file(file_path: Path, patterns: dict) -> list:
+def process_lby_file(file_path: Path, args: dict) -> list:
     """
     Processes a .lby file to find obsolete dependencies.
     """
+    patterns = args["obsolete_dict"]
     results = []
     content = utils.read_file(file_path)
 
@@ -45,10 +47,11 @@ def process_lby_file(file_path: Path, patterns: dict) -> list:
     return results
 
 
-def process_binary_lby_file(file_path: Path, patterns: dict) -> list:
+def process_binary_lby_file(file_path: Path, args: dict) -> list:
     """
     Processes a .lby file to find custom binaries binary libraries
     """
+    patterns = args["whitelist_set"]
     results = []
     content = utils.read_file(file_path)
 
@@ -85,10 +88,11 @@ def process_c_cpp_hpp_includes_file(file_path: Path, patterns: dict) -> list:
 
 
 # Function to process libraries requiring manual process
-def process_manual_libraries(file_path: Path, patterns: dict) -> list:
+def process_manual_libraries(file_path: Path, args: dict) -> list:
     """
     Processes .pkg or .lby files to find libraries that require manual action during migration.
     """
+    patterns = args["manual_process_libraries"]
     results = []
     content = utils.read_file(file_path)
 
@@ -104,27 +108,33 @@ def check_libraries(logical_path, log, verbose=False):
     log("─" * 80 + "\nChecking for invalid libraries and dependencies...")
 
     manual_process_libraries = utils.load_discontinuation_info("manual_process_libs")
-    manual_libs_results = utils.scan_files_parallel(
-        logical_path,
-        [".pkg"],
-        process_manual_libraries,
-        manual_process_libraries,
-    )
-
     obsolete_dict = utils.load_discontinuation_info("obsolete_libs")
-    invalid_pkg_files = utils.scan_files_parallel(
+    whitelist_raw = utils.load_discontinuation_info("binary_lib_whitelist") or []
+    whitelist_set = {str(x).lower() for x in whitelist_raw}
+
+    args = {
+        "manual_process_libraries": manual_process_libraries,
+        "obsolete_dict": obsolete_dict,
+        "whitelist_set": whitelist_set,
+    }
+
+    result = utils.scan_files_parallel(
         logical_path,
         [".pkg"],
-        process_pkg_file,
-        obsolete_dict,
+        [process_manual_libraries, process_pkg_file],
+        args,
     )
+    manual_libs_results = result["process_manual_libraries"]
+    invalid_pkg_files = result["process_pkg_file"]
 
-    lby_dependency_results = utils.scan_files_parallel(
+    result = utils.scan_files_parallel(
         logical_path,
         [".lby"],
-        process_lby_file,
-        obsolete_dict,
+        [process_lby_file, process_binary_lby_file],
+        args,
     )
+    lby_dependency_results = result["process_lby_file"]
+    non_whitelisted_binaries = result["process_binary_lby_file"]
 
     c_include_dependency_results = utils.scan_files_parallel(
         logical_path,
@@ -133,32 +143,18 @@ def check_libraries(logical_path, log, verbose=False):
         obsolete_dict,
     )
 
-    # Load whitelist from discontinuations/binary_lib_whitelist.json
-    whitelist_raw = utils.load_discontinuation_info("binary_lib_whitelist") or []
-    whitelist_set = {str(x).lower() for x in whitelist_raw}
-    non_whitelisted_binaries = utils.scan_files_parallel(
-        logical_path,
-        [".lby"],
-        process_binary_lby_file,
-        whitelist_set,
-    )
-
     if non_whitelisted_binaries:
         # De-duplicate by library name to avoid noisy output
         seen = set()
-        deduped = []
-        for lib_name, file_path in non_whitelisted_binaries:
-            key = lib_name.lower()
-            if key not in seen:
-                seen.add(key)
-                deduped.append((lib_name, file_path))
-
         output = (
             "Potential custom/third-party binaries; make sure you have the source code "
             "or an AS6 replacement/version:"
         )
-        for library_name, file_path in deduped:
-            output += f"\n- {library_name} (Found in: {file_path})"
+        for library_name, file_path in non_whitelisted_binaries:
+            key = library_name.lower()
+            if key not in seen:
+                seen.add(key)
+                output += f"\n- {library_name} (Found in: {file_path})"
         log(output, when="AS6", severity="WARNING")
     else:
         if verbose:
