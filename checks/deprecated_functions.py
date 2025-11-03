@@ -4,10 +4,11 @@ from pathlib import Path
 from utils import utils
 
 
-def check_deprecated_string_functions(path: Path, deprecated_functions: list) -> list:
+def check_deprecated_string_functions(path: Path, args: dict) -> list:
     """
     Scans the given file for deprecated string functions.
     """
+    deprecated_functions = args["deprecated_string_functions"]
     results = []
     if path.is_file():
         content = utils.read_file(path)
@@ -17,11 +18,11 @@ def check_deprecated_string_functions(path: Path, deprecated_functions: list) ->
     return results
 
 
-def check_deprecated_math_functions(path: Path, deprecated_functions: list) -> list:
+def check_deprecated_math_functions(path: Path, args: dict) -> list:
     """
     Scans the given file for deprecated math function calls.
     """
-
+    deprecated_functions = args["deprecated_math_functions"]
     # Match function names only when followed by '('
     function_pattern = re.compile(r"\b(" + "|".join(deprecated_functions) + r")\s*\(")
 
@@ -35,28 +36,25 @@ def check_deprecated_math_functions(path: Path, deprecated_functions: list) -> l
 
 
 def check_deprecated_functions(logical_path, log, verbose=False) -> None:
-    deprecated_string_functions = utils.load_discontinuation_info(
-        "deprecated_string_functions"
-    )
-    deprecated_math_functions = utils.load_discontinuation_info(
-        "deprecated_math_functions"
-    )
+    args = {
+        "deprecated_string_functions": utils.load_discontinuation_info(
+            "deprecated_string_functions"
+        ),
+        "deprecated_math_functions": utils.load_discontinuation_info(
+            "deprecated_math_functions"
+        ),
+    }
 
-    # Store the list of files containing deprecated string functions
-    deprecated_string_files = utils.scan_files_parallel(
+    # Store the list of files containing deprecated string or math functions
+    result = utils.scan_files_parallel(
         logical_path,
         [".st", ".ab"],
-        check_deprecated_string_functions,
-        deprecated_string_functions,
+        [check_deprecated_string_functions, check_deprecated_math_functions],
+        args,
     )
 
-    # Store the list of files containing deprecated math functions
-    deprecated_math_files = utils.scan_files_parallel(
-        logical_path,
-        [".st", ".ab"],
-        check_deprecated_math_functions,
-        deprecated_math_functions,
-    )
+    deprecated_string_files = result["check_deprecated_string_functions"]
+    deprecated_math_files = result["check_deprecated_math_functions"]
 
     if deprecated_string_files:
         log(
