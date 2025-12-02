@@ -28,7 +28,11 @@ def check_vision_settings(apj_path: Path, log, verbose=False) -> None:
                     "\n"
                     "\n- After migrating to AS6 make sure that IP forwarding is activated under the Powerlink interface! (AR/Features_and_changes)"
                     "\n"
-                    "\n- There is no more anonymous access to mappVision applications. Make sure to create users and assign them to the appropriate roles (ex. BR_Engineer) after migrating to AS6.",
+                    "\n- There is no more anonymous access to mappVision applications. Make sure to create users and assign them to the appropriate roles (ex. BR_Engineer) after migrating to AS6."
+                    "\n"
+                    "\n- Open the mappView server configuration file (Configuration View/mappView/Config.mappviewcfg)"
+                    '\n  Check "Change Advanced Parameter Visibility" button in the editor toolbar'
+                    "\n  Add the value 'VisionHmiDevice' under File Device Whitelist",
                     when="AS6",
                     severity="MANDATORY",
                 )
