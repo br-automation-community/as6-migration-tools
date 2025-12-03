@@ -55,5 +55,9 @@
     "UA_MonitoredItemAdd": "The type of application is fundamentally different from the way the new list blocks must be applied, which is why the decision was made to discontinue the blocks. UA_MonitoredItemAddList serve as functional replacements",
     "UA_MonitoredItemOperate": "The type of application is fundamentally different from the way the new list blocks must be applied, which is why the decision was made to discontinue the blocks. UA_MonitoredItemOperateList serve as functional replacements",
     "UA_MonitoredItemRemove": "The type of application is fundamentally different from the way the new list blocks must be applied, which is why the decision was made to discontinue the blocks. UA_MonitoredItemRemoveList serve as functional replacements",
-    "ZYKVLenable": "Supports SG3 only"
+    "ZYKVLenable": "Supports SG3 only",
+    "MpDataRegPar": "The unit must be defined via the Automation Studio system of units. For this reason, parameters Unit and ScaleFactor have been removed. (MappServices/mapp_data)",
+    "MpDataRegParLimits": "The unit must be defined via the Automation Studio system of units. For this reason, parameters Unit and ScaleFactor have been removed.",
+    "MpDataStatisticsUI": "The information structure in the function blocks has been changed from MpDataInfoType to MpDataStatisticsUIInfoType. The definition of the unit in the function block has been standardized. Input parameter MeasurementSystem was added. Parameter Language has been removed from structure UIConnect.",
+    "MpDataTableUI": "The information structure in the function blocks has been changed from MpDataInfoType to MpDataTableUIInfoType. The definition of the unit in the function block has been standardized. Input parameter MeasurementSystem was added. Parameter Language has been removed from structure UIConnect."
 }
