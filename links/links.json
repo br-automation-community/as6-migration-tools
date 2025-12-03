@@ -27,6 +27,10 @@
     "prefix": "mapp_services_help",
     "url": "allgemeines/anderungen/konfigurations-update.html"
   },
+  "MappServices/mapp_data": {
+    "prefix": "mapp_services_help",
+    "url": "allgemeines/anderungen/mapp_data.html"
+  },  
   "MappServices/mapp File/Configuration": {
     "prefix": "mapp_services_help",
     "url": "mpfile/config/mpfilemanager_konfiguration.html"
