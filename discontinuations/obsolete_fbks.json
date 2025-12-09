@@ -60,5 +60,9 @@
     "MpDataRegPar": "The unit must be defined via the Automation Studio system of units. For this reason, parameters Unit and ScaleFactor have been removed. (MappServices/mapp_data)",
     "MpDataRegParLimits": "The unit must be defined via the Automation Studio system of units. For this reason, parameters Unit and ScaleFactor have been removed.",
     "MpDataStatisticsUI": "The information structure in the function blocks has been changed from MpDataInfoType to MpDataStatisticsUIInfoType. The definition of the unit in the function block has been standardized. Input parameter MeasurementSystem was added. Parameter Language has been removed from structure UIConnect.",
-    "MpDataTableUI": "The information structure in the function blocks has been changed from MpDataInfoType to MpDataTableUIInfoType. The definition of the unit in the function block has been standardized. Input parameter MeasurementSystem was added. Parameter Language has been removed from structure UIConnect."
+    "MpDataTableUI": "The information structure in the function blocks has been changed from MpDataInfoType to MpDataTableUIInfoType. The definition of the unit in the function block has been standardized. Input parameter MeasurementSystem was added. Parameter Language has been removed from structure UIConnect.",
+    "CfgSetSntpServer": "Replaced by CfgSetNtpServer()",
+    "CfgSetSntpClient": "Replaced by CfgSetNtpClient()",
+    "CfgGetSntpcData": "Replaced by CfgGetNtpcData()",
+    "CfgGetSntpsData": "Replaced by CfgGetNtpsData()"
 }
