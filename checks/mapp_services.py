@@ -88,17 +88,14 @@ def check_mapp_version(apj_path: Path, log, verbose=False) -> None:
 
     # Check access rights in mpuserx
     # Search in subdirectories for .mpuserx files
-    for subdir in physical_path.iterdir():
-        if not subdir.is_dir():
+    for mpuserx in physical_path.rglob("*.mpuserx"):
+        if not mpuserx.is_file():
             continue
 
-        for mpuserx in subdir.rglob("*.mpuserx"):
-            if not mpuserx.is_file():
-                continue
-
-            log(
-                f"Detected mappUserX configuration in: {mpuserx}. "
-                "After upgrading to AS6 a variety of password policies will be enforced that may require adjustments to your configuration."
-                "Check UserMgmtX->Password policy.",
-                severity="WARNING",
-            )
+        log(
+            f"Detected mappUserX configuration in: {mpuserx}. "
+            "After upgrading to AS6 a variety of password policies will be enforced that may require adjustments to your configuration."
+            "Check UserMgmtX->Password policy.",
+            severity="WARNING",
+            when="AS6"
+        )
