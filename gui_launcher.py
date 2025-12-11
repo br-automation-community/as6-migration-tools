@@ -20,7 +20,7 @@ B_R_BLUE = "#3B82F6"
 HOVER_BLUE = "#2563EB"
 
 LABEL_FONT = ("Segoe UI", 14, "bold")
-FIELD_FONT = ("Segoe UI", 13)
+FIELD_FONT = ("Segoe UI", 15)
 BUTTON_FONT = ("Segoe UI", 14, "bold")
 LOG_FONT = ("Consolas", 12)
 
@@ -381,39 +381,39 @@ class ModernMigrationGUI:
         LICENSE_URL = "https://github.com/br-automation-community/as6-migration-tools/blob/main/LICENSE"
 
         appearance = ctk.get_appearance_mode()
-        bg = "#f0f0f0" if appearance == "Light" else "#2a2d2e"
         fg = "#000000" if appearance == "Light" else "#ffffff"
 
-        msg_win = tk.Toplevel(self.root)
+        msg_win = ctk.CTkToplevel(self.root)
         msg_win.withdraw()  # Hide initially
         msg_win.title("About")
-        msg_win.configure(bg=bg)
         msg_win.resizable(False, False)  # user can't resize; we will set geometry below
 
         try:
             icon_path = os.path.join(
                 getattr(sys, "_MEIPASS", os.path.abspath(".")), "gui_icon.ico"
             )
-            msg_win.iconbitmap(icon_path)
+            msg_win.after(250, lambda: msg_win.iconbitmap(icon_path))
         except Exception:
             pass
 
         # Header + version
-        tk.Label(
-            msg_win, text="AS6 Migration Tools", font=LABEL_FONT, bg=bg, fg=fg
+        ctk.CTkLabel(
+            msg_win,
+            text="AS6 Migration Tools",
+            font=LABEL_FONT,
+            text_color=fg,
         ).pack(pady=(10, 2))
         build = utils.get_version()
-        tk.Label(msg_win, text=f"Version: {build}", font=LABEL_FONT, bg=bg, fg=fg).pack(
-            pady=(0, 6)
-        )
+        ctk.CTkLabel(
+            msg_win, text=f"Version: {build}", font=LABEL_FONT, text_color=fg
+        ).pack(pady=(0, 6))
 
         # Body
-        tk.Label(
+        ctk.CTkLabel(
             msg_win,
             text=about_text,
             justify="left",
-            bg=bg,
-            fg=fg,
+            text_color=fg,
             font=FIELD_FONT,
             padx=20,
             pady=10,
@@ -421,13 +421,12 @@ class ModernMigrationGUI:
         ).pack(anchor="w")
 
         # License line (clickable)
-        license_lbl = tk.Label(
+        license_lbl = ctk.CTkLabel(
             msg_win,
             text="License: MIT",
             justify="left",
-            bg=bg,
-            fg=fg,
-            font=("Segoe UI", 9),
+            text_color=fg,
+            font=("Segoe UI", 10),
             padx=20,
             wraplength=680,
             cursor="hand2",
@@ -436,7 +435,7 @@ class ModernMigrationGUI:
         license_lbl.bind("<Button-1>", lambda _e: webbrowser.open_new(LICENSE_URL))
 
         # Buttons (anchored to bottom so they stay visible)
-        btn_row = tk.Frame(msg_win, bg=bg)
+        btn_row = ctk.CTkFrame(msg_win)
         btn_row.pack(side="bottom", fill="x", pady=12, padx=16)
 
         ctk.CTkButton(
