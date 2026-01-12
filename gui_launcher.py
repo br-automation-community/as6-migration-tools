@@ -108,6 +108,9 @@ class ModernMigrationGUI:
             "OpcUa Update": self.resource_path("helpers/asopcua_update.py"),
             "MappMotion Update": self.resource_path("helpers/mappmotion_update.py"),
             "License checker": self.resource_path("helpers/license_checker.py"),
+            "Convert Automation Basic to Structured Text": self.resource_path(
+                "helpers/ab_2_st_converter.py"
+            ),
         }
 
         self.links = utils.load_file_info("links", "links")
