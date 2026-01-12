@@ -45,7 +45,12 @@ def process_ftp_configurations(file_path: Path) -> list:
 
 
 def check_file_devices(physical_path: Path, log, verbose=False) -> None:
-    log("─" * 80 + "\nChecking for invalid file devices and ftp configurations...")
+    log(
+        utils.section_header(
+            "file-devices",
+            "Checking for invalid file devices and FTP configurations...",
+        )
+    )
 
     results = utils.scan_files_parallel(
         physical_path, [".hw"], [process_file_devices, process_ftp_configurations]
@@ -54,24 +59,19 @@ def check_file_devices(physical_path: Path, log, verbose=False) -> None:
     ftp_configs = results["process_ftp_configurations"]
 
     if file_devices:
-        log(
-            "The following invalid file devices were found: (accessing system partitions / using drive letters)",
-            when="AS6",
-            severity="MANDATORY",
-        )
         grouped_results = {}
         for name, path, file_path in file_devices:
             config_name = file_path.parent.parts[-1]
             grouped_results.setdefault(config_name, set()).add((name, path))
 
-        output = ""
+        output = "The following invalid file devices were found: (accessing system partitions / using drive letters)"
         for config_name, entries in grouped_results.items():
             results = []
             for name, path in sorted(entries):
                 results.append(f"{name} ({path})")
             result_string = ", ".join(results)
             output += f"\n - Hardware configuration '{config_name}': {result_string}"
-        log(output[1:])
+        log(output, when="AS6", severity="MANDATORY")
 
         log(
             "Write operations on a system partition (C:, D:, E:) are not allowed on real targets."
@@ -86,20 +86,17 @@ def check_file_devices(physical_path: Path, log, verbose=False) -> None:
             log("No invalid file device usages were found", severity="INFO")
 
     if ftp_configs:
-        log(
-            "The following potentially invalid ftp configurations were found: (accessing system instead of user partition)",
-            when="AS6",
-            severity="WARNING",
-        )
         grouped_results = {}
         for name, file_path in ftp_configs:
             config_name = file_path.parent.parts[-1]
             grouped_results.setdefault(config_name, set()).add(name)
 
+        output = "The following potentially invalid ftp configurations were found: (accessing system instead of user partition)"
         for config_name, entries in grouped_results.items():
-            log(f"Hardware configuration: {config_name}")
+            output += f"\n\nHardware configuration: {config_name}"
             for name in sorted(entries):
-                log(f"- Accessing '{name}'")
+                output += f"\n- Accessing '{name}'"
+        log(output, when="AS6", severity="WARNING")
     else:
         if verbose:
             log("No potentially invalid ftp configurations found", severity="INFO")

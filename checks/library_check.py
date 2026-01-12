@@ -105,7 +105,11 @@ def process_manual_libraries(file_path: Path, args: dict) -> list:
 
 
 def check_libraries(logical_path, log, verbose=False):
-    log("─" * 80 + "\nChecking for invalid libraries and dependencies...")
+    log(
+        utils.section_header(
+            "libraries", "Checking for invalid libraries and dependencies..."
+        )
+    )
 
     manual_process_libraries = utils.load_discontinuation_info("manual_process_libs")
     obsolete_dict = utils.load_discontinuation_info("obsolete_libs")

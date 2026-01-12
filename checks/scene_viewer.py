@@ -16,7 +16,7 @@ def check_scene_viewer(apj_path: Path, log, verbose: bool = False) -> None:
       2b) mapp Trak: any *.hw that has a property FileDeviceName<N> with Value="SvgData".
       1)  Logical view fallback: presence of any *.scn file.
     """
-    log("─" * 80 + "\nChecking Scene Viewer usage...")
+    log(utils.section_header("scene-viewer", "Checking Scene Viewer usage..."))
 
     project_root = apj_path.parent
 

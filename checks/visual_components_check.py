@@ -1,5 +1,6 @@
-from lxml import etree
 from pathlib import Path
+
+from lxml import etree
 
 from utils import utils
 
@@ -13,7 +14,9 @@ def check_visual_components(apj_path: Path, log, verbose: bool = False):
     Check for the use of VA_Textout and VA_wcTextout functions.
     """
 
-    log("─" * 80 + "\nChecking Visual components usage...")
+    log(
+        utils.section_header("visual-components", "Checking Visual Components usage...")
+    )
 
     logical_path = apj_path.parent / "Logical"
 
@@ -52,7 +55,7 @@ def check_vc4(logical_path: Path, log, verbose: bool) -> None:
             severity="WARNING",
         )
     elif verbose:
-        log("No VA_Textout or VA_wcTextout functions found.")
+        log("No VA_Textout or VA_wcTextout functions found.", severity="VERBOSE")
 
 
 def check_vc3(logical_path: Path, log, verbose: bool = False) -> None:

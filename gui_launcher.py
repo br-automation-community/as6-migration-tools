@@ -242,7 +242,9 @@ class ModernMigrationGUI:
         self, report_path: Path, subject: str, body_html: str
     ):
         """Automate Outlook via PowerShell COM (works without pywin32 inside your exe)."""
-        import os, subprocess, tempfile
+        import os
+        import subprocess
+        import tempfile
 
         ps_script = r"""
     $ErrorActionPreference = 'Stop'
@@ -287,7 +289,9 @@ class ModernMigrationGUI:
         self, report_path: Path, subject: str, body_html: str
     ):
         """Use Outlook command-line switches as last resort (body becomes plaintext)."""
-        import shutil, subprocess, re
+        import re
+        import shutil
+        import subprocess
         from urllib.parse import quote
 
         outlook = shutil.which("outlook.exe")
@@ -317,13 +321,25 @@ class ModernMigrationGUI:
         try:
             report_path = self._export_report_to_temp()
         except Exception as e:
-            messagebox.showerror("Export failed", f"Could not export report:\n{e}")
+            import traceback
+
+            messagebox.showerror(
+                "Export failed",
+                f"Could not export report:\n{e}\n\n{traceback.format_exc()}",
+            )
             return
 
-        subject = self._build_email_subject()
-        body_html = (
-            self._build_email_body_html()
-        )  # short HTML summary (see helper below)
+        try:
+            subject = self._build_email_subject()
+            body_html = self._build_email_body_html()
+        except Exception as e:
+            import traceback
+
+            messagebox.showerror(
+                "Build email failed",
+                f"Could not build email content:\n{e}\n\n{traceback.format_exc()}",
+            )
+            return
 
         # 1) Try pywin32 COM
         try:
@@ -741,9 +757,21 @@ class ModernMigrationGUI:
 
     def parse_and_insert_colored_text(self, text):
         """Parse ANSI escape codes and insert text with appropriate colors in the GUI widget."""
+        # Remove section markers from display (they're for HTML parsing only)
+        section_marker_pattern = re.compile(r"§§SECTION:[^:]+:[^§]+§§")
+        display_text = section_marker_pattern.sub("", text)
+
+        # Skip if the entire message was only a section marker (no other content)
+        # But preserve empty lines and newlines that are part of the original text
+        if not display_text.replace("\n", "").strip():
+            # Still insert newlines if the original text had them
+            if "\n" in text:
+                self.log_text.insert("end", "\n")
+            return
+
         ansi_pattern = r"(\x1b\[[0-9;]*m)"
 
-        parts = re.split(ansi_pattern, text)
+        parts = re.split(ansi_pattern, display_text)
         current_tag = "normal"
 
         for part in parts:
@@ -771,8 +799,18 @@ class ModernMigrationGUI:
         self.status_label.after(0, lambda: self.status_label.configure(text=message))
 
     # ---------------------------
-    # HTML export (Save Log)
+    # HTML export (Save Log) - Modern UI with checklist
     # ---------------------------
+
+    # Inline SVG icons (Heroicons/Lucide style)
+    SVG_ICONS = {
+        "error": '<svg class="icon icon-error" viewBox="0 0 20 20" fill="currentColor"><circle cx="10" cy="10" r="9" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M10 6v5m0 3v.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+        "warning": '<svg class="icon icon-warning" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2L1 18h18L10 2z" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linejoin="round"/><path d="M10 8v4m0 2v.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
+        "info": '<svg class="icon icon-info" viewBox="0 0 20 20" fill="currentColor"><circle cx="10" cy="10" r="9" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M10 9v5m0-8v.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
+        "check": '<svg class="icon icon-check" viewBox="0 0 20 20" fill="currentColor"><path d="M4 10l4 4 8-8" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        "chevron": '<svg class="icon icon-chevron" viewBox="0 0 20 20" fill="currentColor"><path d="M6 8l4 4 4-4" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        "folder": '<svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 5a2 2 0 012-2h3l2 2h5a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V5z"/></svg>',
+    }
 
     def save_log(self):
         """Save the current log as a standalone .html file and open it in the default browser."""
@@ -791,37 +829,92 @@ class ModernMigrationGUI:
         except Exception as e:
             messagebox.showerror("Error", f"Failed to save file:\n{e}")
 
-    def generate_html_log(self) -> str:
+    def _parse_sections(self, raw_lines: list) -> list:
         """
-        Convert the raw ANSI-colored log (self.raw_log_buffer) into an HTML document.
-        - Preserves colors (ERROR/WARNING/INFO) via CSS classes.
-        - Turns underline+blue segments into <a href="...">...</a> using links.json mapping.
-        - Adds a simple header with project path, date, and tool version.
+        Parse raw log lines and split into sections based on §§SECTION:id:title§§ markers.
+        Returns list of dicts: [{"id": str, "title": str, "lines": [str], "errors": int, "warnings": int, "info": int}]
         """
-        # Fallback if raw buffer is empty (shouldn't happen if a script ran)
-        if not self.raw_log_buffer:
-            text_only = self.log_text.get("1.0", "end-1c")
-            return self._wrap_html_document(self._wrap_pre(escape(text_only)))
-
-        ansi_pattern = r"(\x1b\[[0-9;]*m)"  # SGR sequences
-        # Fast-path for known severity colors (kept for compatibility)
-        fast_color_map = {
-            "\x1b[1;31m": "red",  # ERROR/MANDATORY
-            "\x1b[1;33m": "orange",  # WARNING
-            "\x1b[92m": "green",  # INFO
+        sections = []
+        # Use SECTION_METADATA title for intro section if available
+        intro_meta = utils.SECTION_METADATA.get("intro", {})
+        current_section = {
+            "id": "intro",
+            "title": intro_meta.get("title", "Introduction"),
+            "lines": [],
+            "errors": 0,
+            "warnings": 0,
+            "info": 0,
         }
 
-        body_parts = []
-        current = "normal"
+        section_pattern = re.compile(r"§§SECTION:([^:]+):(.+?)§§")
+        # Characters used in separator lines
+        separator_chars = set("─━═╌╍┄┅┈┉-")
 
-        # Track SGR flags to detect links robustly
+        def is_separator_line(line: str) -> bool:
+            """Check if line is primarily a separator (80%+ separator chars)."""
+            stripped = line.strip()
+            if not stripped:
+                return False
+            sep_count = sum(1 for c in stripped if c in separator_chars)
+            # If line is 80%+ separator characters, treat it as a separator
+            return sep_count / len(stripped) > 0.8
+
+        for line in raw_lines:
+            match = section_pattern.search(line)
+            if match:
+                # Save previous section if it has content
+                if current_section["lines"] or current_section["id"] != "intro":
+                    sections.append(current_section)
+                # Start new section
+                section_id = match.group(1)
+                # Use SECTION_METADATA title if available, otherwise use marker title
+                meta = utils.SECTION_METADATA.get(section_id, {})
+                section_title = meta.get("title", match.group(2))
+                # Remove the marker from the line completely
+                clean_line = section_pattern.sub("", line)
+                current_section = {
+                    "id": section_id,
+                    "title": section_title,
+                    "lines": [],  # Don't include the marker line itself
+                    "errors": 0,
+                    "warnings": 0,
+                    "info": 0,
+                }
+            else:
+                # Skip separator lines (lines with only dashes or box-drawing characters)
+                if is_separator_line(line):
+                    continue
+                current_section["lines"].append(line)
+                # Count severities
+                if "[ERROR]" in line or "[MANDATORY]" in line:
+                    current_section["errors"] += 1
+                elif "[WARNING]" in line:
+                    current_section["warnings"] += 1
+                elif "[INFO]" in line:
+                    current_section["info"] += 1
+
+        # Don't forget the last section
+        if current_section["lines"] or current_section["id"] != "intro":
+            sections.append(current_section)
+
+        return sections
+
+    def _convert_ansi_line(self, line: str) -> str:
+        """Convert a single ANSI-colored line to HTML with proper escaping and links."""
+        ansi_pattern = r"(\x1b\[[0-9;]*m)"
+        fast_color_map = {
+            "\x1b[1;31m": "sev-error",
+            "\x1b[1;33m": "sev-warning",
+            "\x1b[92m": "sev-info",
+        }
+
+        parts = []
+        current_class = ""
         underline_on = False
         blue_on = False
-
         link_buffer = []
 
         def flush_link():
-            """Flush accumulated link text into an <a> tag and reset the link buffer."""
             nonlocal link_buffer
             link_text = "".join(link_buffer).strip()
             link_buffer.clear()
@@ -829,257 +922,1032 @@ class ModernMigrationGUI:
                 try:
                     href = utils.build_web_path(self.links, link_text)
                 except Exception:
-                    href = link_text  # best effort fallback
-                body_parts.append(f'<a href="{escape(href)}">{escape(link_text)}</a>')
+                    href = link_text
+                parts.append(f'<a href="{escape(href)}">{escape(link_text)}</a>')
 
-        import re as _re
+        tokens = re.split(ansi_pattern, line)
+        for t in tokens:
+            if not t:
+                continue
 
-        for raw_line in self.raw_log_buffer:
-            tokens = _re.split(ansi_pattern, raw_line)  # keep ANSI tokens
-            for t in tokens:
-                if not t:
-                    continue
+            if re.fullmatch(ansi_pattern, t):
+                params = t[2:-1]
+                codes = []
+                if params:
+                    for c in params.split(";"):
+                        if c.isdigit():
+                            try:
+                                codes.append(int(c))
+                            except ValueError:
+                                pass
 
-                # Is this an SGR code?
-                if _re.fullmatch(ansi_pattern, t):
-                    # Parse SGR params, e.g. "1;31", "4", "94", "0"
-                    params = t[2:-1]  # strip \x1b[  and trailing m
-                    codes = []
-                    if params:
-                        for c in params.split(";"):
-                            if c.isdigit():
-                                try:
-                                    codes.append(int(c))
-                                except ValueError:
-                                    pass
-
-                    # Reset?
-                    if 0 in codes:
-                        # Leaving any modes, close a pending link if needed
-                        if current == "blue":
-                            flush_link()
-                        underline_on = False
-                        blue_on = False
-                        current = "normal"
-                        continue
-
-                    # Toggle underline/color flags (24 = underline off, 39 = default fg color)
-                    if 4 in codes:
-                        underline_on = True
-                    if 24 in codes:
-                        underline_on = False
-                    if 94 in codes:
-                        blue_on = True
-                    if 39 in codes:
-                        blue_on = False
-
-                    # Determine if we should be in link (blue+underline) mode
-                    want_blue = underline_on and blue_on
-                    if current == "blue" and not want_blue:
+                if 0 in codes:
+                    if blue_on and underline_on:
                         flush_link()
-                        current = "normal"
-                        # Note: keep evaluating for severity fast-path below
-
-                    if want_blue and current != "blue":
-                        current = "blue"
-                        continue  # style change handled; next token will be text
-
-                    # Fast-path severity colors (still allow them to override normal mode)
-                    if t in fast_color_map:
-                        # If we were in link mode, close it before switching to colored spans
-                        if current == "blue":
-                            flush_link()
-                            current = "normal"
-                        current = fast_color_map[t]
-                        continue
-
-                    # Any other SGR we don't care about
+                    underline_on = False
+                    blue_on = False
+                    current_class = ""
                     continue
 
-                # --- Normal text chunk ---
-                if current == "blue":
-                    # Handle possible embedded newlines inside link text
-                    s = t.replace("\r\n", "\n")
-                    parts = s.split("\n")
-                    for i, seg in enumerate(parts):
-                        if seg:
-                            link_buffer.append(seg)
-                        if i < len(parts) - 1:
-                            flush_link()
-                            body_parts.append("\n")
-                else:
-                    safe = escape(t)
-                    if current in ("red", "orange", "green"):
-                        body_parts.append(f'<span class="{current}">{safe}</span>')
-                    else:
-                        body_parts.append(safe)
+                if 4 in codes:
+                    underline_on = True
+                if 24 in codes:
+                    underline_on = False
+                if 94 in codes:
+                    blue_on = True
+                if 39 in codes:
+                    blue_on = False
 
-        # End of stream: close any pending link
-        if current == "blue":
+                if not (underline_on and blue_on) and link_buffer:
+                    flush_link()
+
+                if t in fast_color_map:
+                    current_class = fast_color_map[t]
+                continue
+
+            # Text content
+            if underline_on and blue_on:
+                link_buffer.append(t)
+            elif current_class:
+                parts.append(f'<span class="{current_class}">{escape(t)}</span>')
+            else:
+                parts.append(escape(t))
+
+        if link_buffer:
             flush_link()
 
-        # Build header/meta
+        # Join all parts together (each line is processed separately, no embedded newlines)
+        return "".join(parts)
+
+    def _generate_finding_html(self, line: str, finding_id: str) -> str:
+        """Generate HTML for a single finding line with checkbox."""
+        converted = self._convert_ansi_line(line)
+
+        # Determine severity for styling
+        sev_class = ""
+        icon_html = ""
+        if "[ERROR]" in line or "[MANDATORY]" in line:
+            sev_class = "finding-error"
+            icon_html = self.SVG_ICONS["error"]
+            converted = re.sub(
+                r"\[(ERROR|MANDATORY)\]",
+                f'{icon_html}<span class="sev-label">[\\1]</span>',
+                converted,
+            )
+        elif "[WARNING]" in line:
+            sev_class = "finding-warning"
+            icon_html = self.SVG_ICONS["warning"]
+            converted = re.sub(
+                r"\[WARNING\]",
+                f'{icon_html}<span class="sev-label">[WARNING]</span>',
+                converted,
+            )
+        elif "[INFO]" in line:
+            sev_class = "finding-info"
+            icon_html = self.SVG_ICONS["info"]
+            converted = re.sub(
+                r"\[INFO\]",
+                f'{icon_html}<span class="sev-label">[INFO]</span>',
+                converted,
+            )
+        else:
+            # Non-finding line, just return converted text
+            return f'<div class="log-line">{converted}</div>'
+
+        return f"""<label class="finding {sev_class}" data-id="{finding_id}">
+            <input type="checkbox" class="finding-checkbox" id="{finding_id}">
+            <span class="finding-check">{self.SVG_ICONS["check"]}</span>
+            <span class="finding-content">{converted}</span>
+        </label>"""
+
+    def _generate_section_html(self, section: dict, section_index: int) -> str:
+        """Generate HTML for a single collapsible section."""
+        section_id = section["id"]
+        title = section["title"]
+        errors = section["errors"]
+        warnings = section["warnings"]
+        info_count = section["info"]
+        total_findings = errors + warnings + info_count
+
+        # Build badge summary
+        badges = []
+        if errors > 0:
+            badges.append(f'<span class="section-badge badge-error">{errors}</span>')
+        if warnings > 0:
+            badges.append(
+                f'<span class="section-badge badge-warning">{warnings}</span>'
+            )
+        if info_count > 0:
+            badges.append(f'<span class="section-badge badge-info">{info_count}</span>')
+        badges_html = (
+            "".join(badges)
+            if badges
+            else '<span class="section-badge badge-ok">✓</span>'
+        )
+
+        # Generate content lines
+        content_lines = []
+        finding_counter = 0
+        for line in section["lines"]:
+            if not line.strip():
+                content_lines.append('<div class="log-line empty-line">&nbsp;</div>')
+                continue
+
+            # Check if this is a finding (has severity marker)
+            if any(
+                marker in line
+                for marker in ["[ERROR]", "[MANDATORY]", "[WARNING]", "[INFO]"]
+            ):
+                # Use double underscore to separate parts since section IDs contain hyphens
+                finding_id = (
+                    f"finding__{section_id}__{section_index}__{finding_counter}"
+                )
+                content_lines.append(self._generate_finding_html(line, finding_id))
+                finding_counter += 1
+            else:
+                converted = self._convert_ansi_line(line)
+                content_lines.append(f'<div class="log-line">{converted}</div>')
+
+        content_html = "\n".join(content_lines)
+
+        # Get metadata for ordering
+        meta = utils.SECTION_METADATA.get(
+            section_id, {"order": 50, "category": "Other", "icon": "folder"}
+        )
+
+        return f"""<details class="section" id="section-{section_id}" open data-total="{total_findings}">
+            <summary class="section-header">
+                <span class="section-chevron">{self.SVG_ICONS["chevron"]}</span>
+                <span class="section-title">{escape(title)}</span>
+                <span class="section-badges">{badges_html}</span>
+                <span class="section-progress" data-section="{section_id}">0/{total_findings}</span>
+            </summary>
+            <div class="section-content">
+                {content_html}
+            </div>
+        </details>"""
+
+    def generate_html_log(self) -> str:
+        """
+        Convert the raw ANSI-colored log (self.raw_log_buffer) into a modern HTML document.
+        - Parses section markers for collapsible categories
+        - Adds checkboxes per finding with localStorage persistence
+        - Modern UI with glassmorphism and dark/light mode support
+        """
+        if not self.raw_log_buffer:
+            text_only = self.log_text.get("1.0", "end-1c")
+            return self._wrap_html_document(
+                '<pre class="log">' + escape(text_only) + "</pre>", [], 0, 0, 0
+            )
+
+        # Parse sections from raw buffer
+        sections = self._parse_sections(self.raw_log_buffer)
+
+        # Count totals
+        total_errors = sum(s["errors"] for s in sections)
+        total_warnings = sum(s["warnings"] for s in sections)
+        total_info = sum(s["info"] for s in sections)
+
+        # Generate section HTML - skip sections with no findings
+        sections_html = []
+        for i, section in enumerate(sections):
+            # Skip sections with no findings
+            total = section["errors"] + section["warnings"] + section["info"]
+            if total == 0:
+                continue
+            sections_html.append(self._generate_section_html(section, i))
+
+        main_content = "\n".join(sections_html)
+
+        return self._wrap_html_document(
+            main_content, sections, total_errors, total_warnings, total_info
+        )
+
+    def _wrap_html_document(
+        self,
+        body_inner: str,
+        sections: list,
+        total_errors: int,
+        total_warnings: int,
+        total_info: int,
+    ) -> str:
+        """Return a modern standalone HTML document with glassmorphism, dark/light mode, and checklist functionality."""
+
+        # Get project info for header
         project_path = (
             self.selected_folder.get()
             if hasattr(self.selected_folder, "get")
             else str(self.selected_folder)
         )
-
         release_version = utils.get_version()
-
-        header_html = self._build_header(project_path, release_version)
-
-        body_html = "".join(body_parts)
-        # Add icons/labels to [ERROR]/[MANDATORY]/[WARNING]/[INFO]
-        body_html = self._add_severity_icons(body_html)
-
-        return self._wrap_html_document(header_html + self._wrap_pre(body_html))
-
-    def _wrap_pre(self, inner: str) -> str:
-        """Wrap log body in <pre> to preserve whitespace/newlines."""
-        return f'<pre class="log">{inner}</pre>'
-
-    def _add_severity_icons(self, html: str) -> str:
-        """
-        Post-process the rendered HTML (inside <pre>) and prepend an icon + ARIA label
-        to severity tokens like [ERROR]/[MANDATORY]/[WARNING]/[INFO].
-        Keeps the original token for familiarity, improves accessibility/scanability.
-        """
-        import re
-
-        replacements = {
-            r"\[ERROR\]": '<span class="sev sev-error" role="img" aria-label="Error">❗</span><span class="sr-only">Error: </span>[ERROR]',
-            r"\[MANDATORY\]": '<span class="sev sev-error" role="img" aria-label="Mandatory">❗</span><span class="sr-only">Mandatory: </span>[MANDATORY]',
-            r"\[WARNING\]": '<span class="sev sev-warning" role="img" aria-label="Warning">⚠️</span><span class="sr-only">Warning: </span>[WARNING]',
-            r"\[INFO\]": '<span class="sev sev-info" role="img" aria-label="Info">ℹ️</span><span class="sr-only">Info: </span>[INFO]',
-        }
-        for pat, repl in replacements.items():
-            html = re.sub(pat, repl, html)
-        return html
-
-    def _build_header(self, project_path: str, release_version: str) -> str:
-        """Build the header with counters, metadata and a repo link."""
-        raw = "".join(self.raw_log_buffer)
-        err = raw.count("[ERROR]") + raw.count("[MANDATORY]")
-        warn = raw.count("[WARNING]")
-        info = raw.count("[INFO]")
         ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        total_findings = total_errors + total_warnings + total_info
 
-        # Read/clean version and build the link label
-        version = (release_version or "").strip()
+        # Generate sidebar navigation - only show sections with findings
+        nav_items = []
+        for section in sections:
+            sec_id = section["id"]
+            sec_title = section["title"]
+            sec_total = section["errors"] + section["warnings"] + section["info"]
+            # Skip sections with no findings in navigation
+            if sec_total == 0:
+                continue
+            # Truncate long titles
+            display_title = sec_title[:25] + "..." if len(sec_title) > 28 else sec_title
+            nav_items.append(
+                f"""<a href="#section-{sec_id}" class="nav-item" data-section="{sec_id}">
+                <span class="nav-title">{escape(display_title)}</span>
+                <span class="nav-progress" data-nav-section="{sec_id}">0/{sec_total}</span>
+            </a>"""
+            )
+        nav_html = "\n".join(nav_items)
+
         repo_url = "https://github.com/br-automation-community/as6-migration-tools"
-        link_label = "as6-migration-tools" + (f" {escape(version)}" if version else "")
-        tool_link_html = f'<a href="{repo_url}">{link_label}</a>'
-
-        badges = (
-            f'<span class="badge red"><span class="ico" role="img" aria-label="Errors">❗</span>Errors: {err}</span>'
-            f'<span class="badge orange"><span class="ico" role="img" aria-label="Warnings">⚠️</span>Warnings: {warn}</span>'
-            f'<span class="badge green"><span class="ico" role="img" aria-label="Info items">ℹ️</span>Info: {info}</span>'
+        version_label = (
+            f" v{escape(release_version)}"
+            if release_version and release_version != "dev"
+            else ""
         )
 
-        meta = f"""
-    <div class="meta">
-      <div><strong>Project:</strong> {escape(project_path or "-")}</div>
-      <div><strong>Generated:</strong> {escape(ts)}</div>
-      <div>{tool_link_html}</div>  <!-- replaces 'Tool version:' line -->
-    </div>
-    """
-        return f"<header><h1>AS4 to AS6 Migration Log</h1>{badges}{meta}<hr></header>"
-
-    def _wrap_html_document(self, body_inner: str) -> str:
-        """Return a minimal standalone HTML document with dark theme and print-friendly light mode."""
         css = """
+:root {
+    --bg: #0f172a;
+    --bg-card: rgba(30, 41, 59, 0.8);
+    --bg-card-solid: #1e293b;
+    --fg: #e2e8f0;
+    --fg-muted: #94a3b8;
+    --border: rgba(148, 163, 184, 0.2);
+    --border-hover: rgba(148, 163, 184, 0.4);
+    --accent: #3b82f6;
+    --accent-hover: #60a5fa;
+    --error: #ef4444;
+    --error-bg: rgba(239, 68, 68, 0.1);
+    --warning: #f59e0b;
+    --warning-bg: rgba(245, 158, 11, 0.1);
+    --info: #22c55e;
+    --info-bg: rgba(34, 197, 94, 0.1);
+    --success: #10b981;
+    --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.2);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -4px rgba(0, 0, 0, 0.2);
+}
+
+/* Light mode */
+[data-theme="light"] {
+    --bg: #f8fafc;
+    --bg-card: rgba(255, 255, 255, 0.9);
+    --bg-card-solid: #ffffff;
+    --fg: #1e293b;
+    --fg-muted: #64748b;
+    --border: rgba(0, 0, 0, 0.1);
+    --border-hover: rgba(0, 0, 0, 0.2);
+    --error-bg: rgba(239, 68, 68, 0.08);
+    --warning-bg: rgba(245, 158, 11, 0.08);
+    --info-bg: rgba(34, 197, 94, 0.08);
+    --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+}
+
+@media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+        --bg: #f8fafc;
+        --bg-card: rgba(255, 255, 255, 0.9);
+        --bg-card-solid: #ffffff;
+        --fg: #1e293b;
+        --fg-muted: #64748b;
+        --border: rgba(0, 0, 0, 0.1);
+        --border-hover: rgba(0, 0, 0, 0.2);
+        --error-bg: rgba(239, 68, 68, 0.08);
+        --warning-bg: rgba(245, 158, 11, 0.08);
+        --info-bg: rgba(34, 197, 94, 0.08);
+        --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+        --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+    }
+}
+
+@media print {
     :root {
-      --bg: #0f172a;       /* slate-900 */
-      --fg: #e5e7eb;       /* gray-200 */
-      --muted: #94a3b8;    /* slate-400 */
-      --hr: rgba(148, 163, 184, 0.25);
-      --badge-bg: #1f2937; /* gray-800 */
-      --link: #60a5fa;     /* blue-400 */
-      --red: #ef4444;      /* red-500 */
-      --orange: #f59e0b;   /* amber-500 */
-      --green: #22c55e;    /* green-500 */
-    }
-    @media print {
-      :root {
         --bg: #ffffff;
-        --fg: #111827;
-        --muted: #374151;
-        --hr: #e5e7eb;
-        --badge-bg: #f3f4f6;
-        --link: #1d4ed8;
-      }
-      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        --bg-card: #ffffff;
+        --bg-card-solid: #ffffff;
+        --fg: #000000;
+        --fg-muted: #4b5563;
     }
-    html, body { height: 100%; }
-    body {
-      background: var(--bg);
-      color: var(--fg);
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-      margin: 20px;
-      line-height: 1.35;
+    .sidebar { display: none !important; }
+    .main-content { margin-left: 0 !important; }
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; font-size: 16px; }
+body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 1rem;
+    line-height: 1.7;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* Layout */
+.layout {
+    display: flex;
+    min-height: 100vh;
+}
+
+/* Sidebar */
+.sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 300px;
+    height: 100vh;
+    background: var(--bg-card);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-right: 1px solid var(--border);
+    padding: 20px 16px;
+    overflow-y: auto;
+    z-index: 100;
+}
+
+.sidebar-header {
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+}
+
+.sidebar-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    margin: 0 0 6px 0;
+    color: var(--fg);
+}
+
+.sidebar-meta {
+    font-size: 0.75rem;
+    color: var(--fg-muted);
+    line-height: 1.4;
+}
+
+/* Theme toggle */
+.theme-toggle {
+    display: flex;
+    gap: 4px;
+    margin-top: 10px;
+    background: var(--border);
+    border-radius: 6px;
+    padding: 3px;
+}
+
+.theme-btn {
+    flex: 1;
+    padding: 5px 8px;
+    border: none;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--fg-muted);
+    font-size: 0.7rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+}
+
+.theme-btn:hover {
+    color: var(--fg);
+}
+
+.theme-btn.active {
+    background: var(--bg-card-solid);
+    color: var(--fg);
+    box-shadow: var(--shadow);
+}
+
+.theme-btn svg {
+    width: 12px;
+    height: 12px;
+}
+
+.sidebar-meta a {
+    color: var(--accent);
+    text-decoration: none;
+}
+.sidebar-meta a:hover {
+    text-decoration: underline;
+}
+
+/* Progress summary */
+.progress-summary {
+    background: var(--bg-card-solid);
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 14px;
+    border: 1px solid var(--border);
+}
+
+.progress-bar-container {
+    background: var(--border);
+    border-radius: 999px;
+    height: 6px;
+    overflow: hidden;
+    margin-bottom: 10px;
+}
+
+.progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--success), var(--accent));
+    border-radius: 999px;
+    width: 0%;
+    transition: width 0.3s ease;
+}
+
+.progress-text {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--fg);
+    text-align: center;
+}
+
+/* Summary badges */
+.summary-badges {
+    display: flex;
+    gap: 6px;
+    margin-top: 10px;
+}
+
+.summary-badge {
+    flex: 1;
+    text-align: center;
+    padding: 6px 4px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.summary-badge.error {
+    background: var(--error-bg);
+    color: var(--error);
+}
+.summary-badge.warning {
+    background: var(--warning-bg);
+    color: var(--warning);
+}
+.summary-badge.info {
+    background: var(--info-bg);
+    color: var(--info);
+}
+
+/* Navigation */
+.nav-section {
+    margin-bottom: 8px;
+}
+
+.nav-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--fg-muted);
+    padding: 6px 10px 3px;
+}
+
+.nav-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    border-radius: 8px;
+    color: var(--fg);
+    text-decoration: none;
+    font-size: 0.85rem;
+    font-weight: 500;
+    transition: all 0.15s ease;
+    margin-bottom: 3px;
+    background: var(--bg-card-solid);
+    border: 1px solid var(--border);
+}
+
+.nav-item:hover {
+    background: var(--border);
+}
+
+.nav-item.completed {
+    opacity: 0.6;
+}
+
+.nav-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+}
+
+.nav-progress {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--fg);
+    background: var(--border);
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-variant-numeric: tabular-nums;
+    min-width: 44px;
+    text-align: center;
+}
+
+/* Main content */
+.main-content {
+    margin-left: 300px;
+    padding: 32px 40px;
+    flex: 1;
+    min-width: 0;
+}
+
+.header {
+    margin-bottom: 32px;
+}
+
+.header h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0 0 8px 0;
+    color: var(--fg);
+}
+
+.header-meta {
+    color: var(--fg-muted);
+    font-size: 0.9rem;
+}
+
+/* Sections */
+.section {
+    background: var(--bg-card);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    margin-bottom: 16px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    transition: all 0.2s ease;
+}
+
+.section:hover {
+    border-color: var(--border-hover);
+}
+
+.section-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 20px;
+    cursor: pointer;
+    user-select: none;
+    list-style: none;
+    transition: background 0.15s ease;
+}
+
+.section-header:hover {
+    background: var(--border);
+}
+
+.section-header::-webkit-details-marker {
+    display: none;
+}
+
+.section-chevron {
+    transition: transform 0.2s ease;
+    color: var(--fg-muted);
+}
+
+details[open] .section-chevron {
+    transform: rotate(180deg);
+}
+
+.section-title {
+    flex: 1;
+    font-weight: 600;
+    font-size: 1.1rem;
+}
+
+.section-badges {
+    display: flex;
+    gap: 6px;
+}
+
+.section-badge {
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    min-width: 28px;
+    text-align: center;
+}
+
+.badge-error { background: var(--error-bg); color: var(--error); }
+.badge-warning { background: var(--warning-bg); color: var(--warning); }
+.badge-info { background: var(--info-bg); color: var(--info); }
+.badge-ok { background: var(--info-bg); color: var(--success); }
+
+.section-progress {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--fg);
+    background: var(--border);
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-variant-numeric: tabular-nums;
+    min-width: 55px;
+    text-align: center;
+}
+
+.section-content {
+    padding: 0 20px 20px;
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.9rem;
+}
+
+/* Log lines */
+.log-line {
+    padding: 6px 0;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    line-height: 1.7;
+}
+
+.log-line br {
+    display: block;
+    content: "";
+    margin-top: 0.3em;
+}
+
+.empty-line {
+    height: 0.75em;
+}
+
+/* Findings (checkable items) */
+.finding {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 16px;
+    margin: 8px 0;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    position: relative;
+}
+
+.finding:hover {
+    background: var(--border);
+}
+
+.finding-error { background: var(--error-bg); border-left: 3px solid var(--error); }
+.finding-warning { background: var(--warning-bg); border-left: 3px solid var(--warning); }
+.finding-info { background: var(--info-bg); border-left: 3px solid var(--info); }
+
+.finding-checkbox {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.finding-check {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--border-hover);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+    background: var(--bg-card-solid);
+}
+
+.finding-check .icon {
+    opacity: 0;
+    transform: scale(0.5);
+    transition: all 0.15s ease;
+    color: var(--success);
+}
+
+.finding-checkbox:checked + .finding-check {
+    background: var(--success);
+    border-color: var(--success);
+}
+
+.finding-checkbox:checked + .finding-check .icon {
+    opacity: 1;
+    transform: scale(1);
+    color: white;
+}
+
+.finding-checkbox:checked ~ .finding-content {
+    opacity: 0.5;
+    text-decoration: line-through;
+}
+
+.finding-content {
+    flex: 1;
+    transition: opacity 0.15s ease;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    line-height: 1.7;
+}
+
+/* Icons */
+.icon {
+    width: 16px;
+    height: 16px;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.icon-error { color: var(--error); }
+.icon-warning { color: var(--warning); }
+.icon-info { color: var(--info); }
+.icon-chevron { width: 20px; height: 20px; }
+
+/* Severity labels */
+.sev-error { color: var(--error); font-weight: 700; }
+.sev-warning { color: var(--warning); font-weight: 700; }
+.sev-info { color: var(--info); }
+.sev-label { margin-left: 4px; }
+
+/* Links */
+a {
+    color: var(--accent);
+    text-decoration: none;
+    transition: color 0.15s ease;
+}
+a:hover {
+    color: var(--accent-hover);
+    text-decoration: underline;
+}
+
+/* Responsive */
+@media (max-width: 1100px) {
+    .sidebar {
+        width: 260px;
+        padding: 16px 12px;
     }
-    header h1 { margin: 0 0 6px 0; font-size: 20px; font-weight: 700; color: var(--fg); }
-
-    /* Badges */
-    .badge {
-      display: inline-block; padding: 2px 8px; border-radius: 9999px; margin-right: 8px;
-      font-size: 12px; font-weight: 700; background: var(--badge-bg);
-      font-variant-numeric: tabular-nums;   /* stable widths for counts */
+    .main-content {
+        margin-left: 260px;
+        padding: 24px;
     }
-    .badge.red    { color: var(--red); }
-    .badge.orange { color: var(--orange); }
-    .badge.green  { color: var(--green); }
-    .badge .ico { margin-right: 6px; display: inline-block; }
+}
 
-    /* Meta */
-    .meta { margin-top: 8px; font-size: 12px; color: var(--muted); }
-
-    /* Log body */
-    .log {
-      white-space: pre-wrap;
-      font-size: 13px;
-      margin: 0;           /* avoid extra spacing around the log */
-      tab-size: 4;         /* nicer alignment for indented/log-style text */
+@media (max-width: 900px) {
+    .sidebar {
+        position: static;
+        width: 100%;
+        height: auto;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
     }
-    .log a { word-break: break-word; overflow-wrap: anywhere; }
-
-    /* Severity color spans (already emitted by generator) */
-    .red    { color: var(--red);   font-weight: 700; }
-    .orange { color: var(--orange);font-weight: 700; }
-    .green  { color: var(--green); }
-
-    /* Anchors, rule */
-    a { color: var(--link); text-decoration: underline; }
-    hr { border: 0; height: 1px; background: var(--hr); margin: 12px 0 16px 0; }
-
-    /* Screen-reader only label (for accessibility) */
-    .sr-only {
-      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
-      overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+    .main-content {
+        margin-left: 0;
+        padding: 20px;
     }
-
-    /* Inline severity icon used in lines */
-    .sev {
-      display: inline-block; width: 1.25em; text-align: center; margin-right: .25em;
-      vertical-align: -0.08em; /* icon baseline alignment */
+    .nav-item {
+        padding: 10px 12px;
     }
-    .sev-error   { color: var(--red);   font-weight: 700; }
-    .sev-warning { color: var(--orange);font-weight: 700; }
-    .sev-info    { color: var(--green); }
-    """
+}
+"""
+
+        js = """
+(function() {
+    const STORAGE_KEY = 'as6-migration-checklist-' + location.pathname;
+    
+    // Load saved state
+    function loadState() {
+        try {
+            return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+        } catch (e) {
+            return {};
+        }
+    }
+    
+    // Save state
+    function saveState(state) {
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        } catch (e) {}
+    }
+    
+    // Update progress displays
+    function updateProgress() {
+        const state = loadState();
+        const checkboxes = document.querySelectorAll('.finding-checkbox');
+        let totalChecked = 0;
+        const sectionCounts = {};
+        
+        checkboxes.forEach(cb => {
+            // ID format: finding__sectionId__sectionIndex__findingCounter
+            const parts = cb.id.split('__');
+            const sectionId = parts[1]; // Extract section ID
+            if (!sectionCounts[sectionId]) {
+                sectionCounts[sectionId] = { checked: 0, total: 0 };
+            }
+            sectionCounts[sectionId].total++;
+            if (cb.checked) {
+                sectionCounts[sectionId].checked++;
+                totalChecked++;
+            }
+        });
+        
+        // Update section progress
+        Object.keys(sectionCounts).forEach(sectionId => {
+            const { checked, total } = sectionCounts[sectionId];
+            // Only update elements with class .section-progress or .nav-progress, not the entire nav-item
+            const els = document.querySelectorAll(`.section-progress[data-section="${sectionId}"], .nav-progress[data-nav-section="${sectionId}"]`);
+            els.forEach(el => el.textContent = `${checked}/${total}`);
+            
+            // Mark nav item as completed
+            const navItem = document.querySelector(`.nav-item[data-section="${sectionId}"]`);
+            if (navItem) {
+                navItem.classList.toggle('completed', checked === total && total > 0);
+            }
+        });
+        
+        // Update total progress
+        const total = checkboxes.length;
+        const percent = total > 0 ? Math.round((totalChecked / total) * 100) : 0;
+        const progressBar = document.querySelector('.progress-bar');
+        const progressText = document.querySelector('.progress-text');
+        if (progressBar) progressBar.style.width = percent + '%';
+        if (progressText) progressText.textContent = `${totalChecked} of ${total} completed (${percent}%)`;
+    }
+    
+    // Theme handling
+    const THEME_KEY = 'as6-migration-theme';
+    
+    function getSystemTheme() {
+        return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    }
+    
+    function setTheme(theme) {
+        if (theme === 'auto') {
+            document.documentElement.removeAttribute('data-theme');
+        } else {
+            document.documentElement.setAttribute('data-theme', theme);
+        }
+        localStorage.setItem(THEME_KEY, theme);
+        updateThemeButtons(theme);
+    }
+    
+    function updateThemeButtons(theme) {
+        document.querySelectorAll('.theme-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.theme === theme);
+        });
+    }
+    
+    // Initialize
+    document.addEventListener('DOMContentLoaded', function() {
+        const state = loadState();
+        
+        // Restore checkbox states
+        document.querySelectorAll('.finding-checkbox').forEach(cb => {
+            if (state[cb.id]) {
+                cb.checked = true;
+            }
+            
+            // Listen for changes
+            cb.addEventListener('change', function() {
+                const newState = loadState();
+                if (this.checked) {
+                    newState[this.id] = true;
+                } else {
+                    delete newState[this.id];
+                }
+                saveState(newState);
+                updateProgress();
+            });
+        });
+        
+        // Restore section collapse states and listen for changes
+        const SECTIONS_KEY = 'as6-migration-sections-' + location.pathname;
+        let sectionState = {};
+        try {
+            sectionState = JSON.parse(localStorage.getItem(SECTIONS_KEY)) || {};
+        } catch (e) {}
+        
+        document.querySelectorAll('details.section').forEach(details => {
+            const sectionId = details.id;
+            // Restore saved state (default is open)
+            if (sectionState[sectionId] === false) {
+                details.removeAttribute('open');
+            }
+            
+            // Listen for toggle events
+            details.addEventListener('toggle', function() {
+                let currentState = {};
+                try {
+                    currentState = JSON.parse(localStorage.getItem(SECTIONS_KEY)) || {};
+                } catch (e) {}
+                currentState[this.id] = this.open;
+                try {
+                    localStorage.setItem(SECTIONS_KEY, JSON.stringify(currentState));
+                } catch (e) {}
+            });
+        });
+        
+        // Initialize theme
+        const savedTheme = localStorage.getItem(THEME_KEY) || 'auto';
+        setTheme(savedTheme);
+        
+        // Theme toggle buttons
+        document.querySelectorAll('.theme-btn').forEach(btn => {
+            btn.addEventListener('click', () => setTheme(btn.dataset.theme));
+        });
+        
+        updateProgress();
+    });
+})();
+"""
+
+        header_html = f"""
+<div class="header">
+    <h1>AS4 to AS6 Migration Report</h1>
+    <div class="header-meta">
+        <strong>Project:</strong> {escape(project_path or "-")} &nbsp;|&nbsp;
+        <strong>Generated:</strong> {escape(ts)}
+    </div>
+</div>
+"""
+
+        sidebar_html = f"""
+<aside class="sidebar">
+    <div class="sidebar-header">
+        <h2 class="sidebar-title">Migration Checklist</h2>
+        <div class="sidebar-meta">
+            <a href="{repo_url}">as6-migration-tools{version_label}</a>
+        </div>
+        <div class="theme-toggle">
+            <button class="theme-btn" data-theme="light" title="Light mode">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+                Light
+            </button>
+            <button class="theme-btn active" data-theme="auto" title="Auto (system)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 0 0 20V2z" fill="currentColor"/></svg>
+                Auto
+            </button>
+            <button class="theme-btn" data-theme="dark" title="Dark mode">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                Dark
+            </button>
+        </div>
+    </div>
+    
+    <div class="progress-summary">
+        <div class="progress-bar-container">
+            <div class="progress-bar"></div>
+        </div>
+        <div class="progress-text">0 of {total_findings} completed (0%)</div>
+        <div class="summary-badges">
+            <div class="summary-badge error">{total_errors} Errors</div>
+            <div class="summary-badge warning">{total_warnings} Warnings</div>
+            <div class="summary-badge info">{total_info} Info</div>
+        </div>
+    </div>
+    
+    <nav class="nav-section">
+        <div class="nav-label">Sections</div>
+        {nav_html}
+    </nav>
+</aside>
+"""
+
         return f"""<!DOCTYPE html>
-    <html lang="en">
-    <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>AS4 to AS6 Migration Log</title>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>AS4 to AS6 Migration Report</title>
     <style>{css}</style>
-    </head>
-    <body>
-    {body_inner}
-    </body>
-    </html>"""
+</head>
+<body>
+    <div class="layout">
+        {sidebar_html}
+        <main class="main-content">
+            {header_html}
+            {body_inner}
+        </main>
+    </div>
+    <script>{js}</script>
+</body>
+</html>"""
 
     def clear_log(self):
         """Clear GUI log and the raw buffer."""
