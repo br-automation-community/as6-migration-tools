@@ -12,8 +12,9 @@ def replace_functions_and_constants(
     """
     Replace function calls and constants in a file based on the provided mappings.
     """
-    original_hash = utils.calculate_file_hash(file_path)
-    original_content = utils.read_file(file_path)
+    original_content, original_encoding, original_bytes = utils.read_file_with_encoding(
+        file_path
+    )
 
     modified_content = original_content
     function_replacements = 0
@@ -38,13 +39,9 @@ def replace_functions_and_constants(
         )
         constant_replacements += num_replacements
 
-    if modified_content != original_content:
-        file_path.write_text(modified_content, encoding="iso-8859-1")
-
-        new_hash = utils.calculate_file_hash(file_path)
-        if original_hash == new_hash:
-            return function_replacements, constant_replacements, False
-
+    if utils.write_file_if_changed(
+        file_path, modified_content, original_encoding, original_bytes
+    ):
         utils.log(
             f"{function_replacements + constant_replacements:4d} changes written to: {file_path}",
             severity="INFO",

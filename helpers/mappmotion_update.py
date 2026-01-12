@@ -32,8 +32,9 @@ def replace_enums(file_path: Path, enum_mapping, verbose=False):
     Replace enumerators in a file based on the provided mappings.
     """
 
-    original_hash = utils.calculate_file_hash(file_path)
-    original_content = utils.read_file(file_path)
+    original_content, original_encoding, original_bytes = utils.read_file_with_encoding(
+        file_path
+    )
     modified_content = original_content
     enum_replacements = 0
 
@@ -51,13 +52,9 @@ def replace_enums(file_path: Path, enum_mapping, verbose=False):
             )
         enum_replacements += num_replacements
 
-    if modified_content != original_content:
-        file_path.write_text(modified_content, encoding="iso-8859-1")
-
-        new_hash = utils.calculate_file_hash(file_path)
-        if original_hash == new_hash:
-            return enum_replacements, False
-
+    if utils.write_file_if_changed(
+        file_path, modified_content, original_encoding, original_bytes
+    ):
         utils.log(
             f"{enum_replacements :4d} changes written to: {file_path}", severity="INFO"
         )
@@ -70,8 +67,9 @@ def replace_inputs(file_path: Path, input_mapping, verbose=False):
     """
     Replace various FUB-inputs in code based on the provided mappings
     """
-    original_hash = utils.calculate_file_hash(file_path)
-    original_content = utils.read_file(file_path)
+    original_content, original_encoding, original_bytes = utils.read_file_with_encoding(
+        file_path
+    )
     modified_content = original_content
     input_replacements = 0
 
@@ -91,12 +89,9 @@ def replace_inputs(file_path: Path, input_mapping, verbose=False):
             )
         input_replacements += num_replacements
 
-    if modified_content != original_content:
-        file_path.write_text(modified_content, encoding="iso-8859-1")
-        new_hash = utils.calculate_file_hash(file_path)
-        if original_hash == new_hash:
-            return input_replacements, False
-
+    if utils.write_file_if_changed(
+        file_path, modified_content, original_encoding, original_bytes
+    ):
         utils.log(
             f"{input_replacements:4d} change(s) written to: {file_path}",
             severity="INFO",
@@ -113,8 +108,9 @@ def replace_fbs_and_types(
     Replace function block calls and types in a file based on the provided mappings.
     """
 
-    original_hash = utils.calculate_file_hash(file_path)
-    original_content = utils.read_file(file_path)
+    original_content, original_encoding, original_bytes = utils.read_file_with_encoding(
+        file_path
+    )
     modified_content = original_content
     fb_replacements = 0
     type_replacements = 0
@@ -168,13 +164,9 @@ def replace_fbs_and_types(
             )
         type_replacements += num_replacements
 
-    if modified_content != original_content:
-        file_path.write_text(modified_content, encoding="iso-8859-1")
-
-        new_hash = utils.calculate_file_hash(file_path)
-        if original_hash == new_hash:
-            return fb_replacements, type_replacements, False
-
+    if utils.write_file_if_changed(
+        file_path, modified_content, original_encoding, original_bytes
+    ):
         utils.log(
             f"{fb_replacements + type_replacements:4d} change(s) written to: {file_path}",
             severity="INFO",
