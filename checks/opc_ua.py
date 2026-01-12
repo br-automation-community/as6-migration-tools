@@ -1,5 +1,6 @@
-from lxml import etree
 from pathlib import Path
+
+from lxml import etree
 
 
 def check_uad_files(root_dir: Path, log, verbose=False) -> None:
@@ -61,7 +62,8 @@ def check_uad_files(root_dir: Path, log, verbose=False) -> None:
 
     # Check for OPC UA activation in hardware files
     # Search in subdirectories for .hw files
-    output = ""
+    output_model1 = ""
+    output_typecast = ""
     for subdir in root_dir.iterdir():
         if not subdir.is_dir():
             continue
@@ -79,17 +81,37 @@ def check_uad_files(root_dir: Path, log, verbose=False) -> None:
                 )
 
                 if matches:
-                    if len(output) == 0:
-                        output += (
+                    if len(output_model1) == 0:
+                        output_model1 += (
                             "OPC UA model 1 is not supported in AS6 and will be automatically converted to model 2. "
                             "This changes the namespace ID for variables."
                             "\nThe following hardware files have OPC UA model 1 activated:\n"
                         )
-                    output += f"\n- {hw_file}"
+                    output_model1 += f"\n- {hw_file}"
+
+                    # Check if ImplicitTypeCast parameter is explicitly set
+                    # In AS4, the default is "on" (parameter not present means activated)
+                    # In AS6, the default is "deactivated"
+                    # If the parameter is not present, inform the user about the behavior change
+                    implicit_typecast_param = root_element.xpath(
+                        ".//*[local-name()='Parameter'][@ID='OpcUaConversions_ImplicitTypeCast']"
+                    )
+                    if not implicit_typecast_param:
+                        if len(output_typecast) == 0:
+                            output_typecast += (
+                                '"OPC-UA System -> Conversions -> Implicit Type Cast" uses AS4 default (on). '
+                                "In AS6, the default is deactivated, which may cause 'Bad_TypeMismatch' errors "
+                                "during OPC UA client method calls (e.g., Int64 to Int32 conversions)."
+                                "\nThe following hardware files use the AS4 default:\n"
+                            )
+                        output_typecast += f"\n- {hw_file}"
 
             except Exception:
                 # Skip files that can't be parsed as XML
                 continue
 
-    if output:
-        log(output, severity="INFO")
+    if output_model1:
+        log(output_model1, severity="INFO")
+
+    if output_typecast:
+        log(output_typecast, severity="INFO")
