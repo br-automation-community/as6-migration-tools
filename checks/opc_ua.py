@@ -92,7 +92,7 @@ def check_uad_files(root_dir: Path, log, verbose=False) -> None:
                     # Check if ImplicitTypeCast parameter is explicitly set
                     # In AS4, the default is "on" (parameter not present means activated)
                     # In AS6, the default is "deactivated"
-                    # If the parameter is not present, warn the user about the behavior change
+                    # If the parameter is not present, inform the user about the behavior change
                     implicit_typecast_param = root_element.xpath(
                         ".//*[local-name()='Parameter'][@ID='OpcUaConversions_ImplicitTypeCast']"
                     )
