@@ -6,10 +6,10 @@ import os
 import re
 import sys
 from pathlib import Path
-from typing import Union, Callable
+from typing import Callable, Union
 
-from CTkMessagebox import CTkMessagebox
 from charset_normalizer import from_path
+from CTkMessagebox import CTkMessagebox
 
 _CACHED_LINKS = None
 
@@ -331,6 +331,47 @@ def read_file(file: Path):
         if result:
             return file.read_text(encoding=result.encoding, errors="ignore")
     return ""
+
+
+def read_file_with_encoding(file: Path) -> tuple[str, str, bytes]:
+    """
+    Read a file and return its content, detected encoding, and original bytes.
+    This is useful when you need to write back to the file using the same encoding,
+    and verify that the file actually changed at the byte level.
+
+    Returns:
+        tuple[str, str, bytes]: (content, encoding, original_bytes)
+    """
+    from charset_normalizer import from_bytes
+
+    original_bytes = file.read_bytes()
+
+    # Use charset_normalizer to detect the actual encoding from bytes (no re-read)
+    result = from_bytes(original_bytes).best()
+    if result:
+        encoding = result.encoding
+        content = original_bytes.decode(encoding, errors="ignore")
+        return content, encoding, original_bytes
+
+    # Fallback to utf-8 with error handling
+    return original_bytes.decode("utf-8", errors="ignore"), "utf-8", original_bytes
+
+
+def write_file_if_changed(
+    file: Path, content: str, encoding: str, original_bytes: bytes
+) -> bool:
+    """
+    Write content to file only if the resulting bytes differ from original.
+    This prevents unnecessary changes in version control.
+
+    Returns:
+        bool: True if file was written, False if unchanged
+    """
+    new_bytes = content.encode(encoding, errors="ignore")
+    if new_bytes == original_bytes:
+        return False
+    file.write_bytes(new_bytes)
+    return True
 
 
 def file_value_count(file_path: Path, pairs):
