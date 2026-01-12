@@ -46,7 +46,7 @@ def replace_enums(file_path: Path, enum_mapping, verbose=False):
         )
         if num_replacements > 0 and verbose:
             utils.log(
-                f"Replaced {num_replacements} occurance(s) of '{old_const}' with '{new_const}'",
+                f"Replaced {num_replacements} occurrence(s) of '{old_const}' with '{new_const}'",
                 severity="INFO",
             )
         enum_replacements += num_replacements
@@ -86,7 +86,7 @@ def replace_inputs(file_path: Path, input_mapping, verbose=False):
         )
         if num_replacements > 0 and verbose:
             utils.log(
-                f"Replaced {num_replacements} occurance(s) of '{old_input}' with '{old_input}'",
+                f"Replaced {num_replacements} occurrence(s) of '{old_input}' with '{replacement}'",
                 severity="INFO",
             )
         input_replacements += num_replacements
@@ -97,7 +97,7 @@ def replace_inputs(file_path: Path, input_mapping, verbose=False):
         if original_hash == new_hash:
             return input_replacements, False
 
-        log(
+        utils.log(
             f"{input_replacements:4d} change(s) written to: {file_path}",
             severity="INFO",
         )

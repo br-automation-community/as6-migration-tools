@@ -6,10 +6,10 @@ import os
 import re
 import sys
 from pathlib import Path
-from typing import Union, Callable
+from typing import Callable, Union
 
-from CTkMessagebox import CTkMessagebox
 from charset_normalizer import from_path
+from CTkMessagebox import CTkMessagebox
 
 _CACHED_LINKS = None
 
@@ -336,7 +336,7 @@ def read_file(file: Path):
 def file_value_count(file_path: Path, pairs):
     for line in read_file(file_path).splitlines():
         for obj in pairs:
-            if f'ID="{obj["id"]}"' and f'Value="{obj["value"]}"' in line:
+            if f'ID="{obj["id"]}"' in line and f'Value="{obj["value"]}"' in line:
                 obj["cnt"] += 1
 
     return pairs
