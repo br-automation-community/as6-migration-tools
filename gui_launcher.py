@@ -757,9 +757,9 @@ class ModernMigrationGUI:
 
     def parse_and_insert_colored_text(self, text):
         """Parse ANSI escape codes and insert text with appropriate colors in the GUI widget."""
-        # Remove section markers from display (they're for HTML parsing only)
-        section_marker_pattern = re.compile(r"§§SECTION:[^:]+:[^§]+§§")
-        display_text = section_marker_pattern.sub("", text)
+        # Extract title from section markers for display (keep "Checking..." text visible)
+        section_marker_pattern = re.compile(r"§§SECTION:[^:]+:([^§]+)§§")
+        display_text = section_marker_pattern.sub(r"\1", text)
 
         # Skip if the entire message was only a section marker (no other content)
         # But preserve empty lines and newlines that are part of the original text
