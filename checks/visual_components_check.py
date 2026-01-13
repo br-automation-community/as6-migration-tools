@@ -55,7 +55,7 @@ def check_vc4(logical_path: Path, log, verbose: bool) -> None:
             severity="WARNING",
         )
     elif verbose:
-        log("No VA_Textout or VA_wcTextout functions found.", severity="VERBOSE")
+        log("No VA_Textout or VA_wcTextout functions found.")
 
 
 def check_vc3(logical_path: Path, log, verbose: bool = False) -> None:
