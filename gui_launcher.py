@@ -1725,6 +1725,9 @@ a:hover {
         
         updateProgress();
     });
+    
+    // Expose sendEmail globally for onclick handler
+    window.sendEmail = sendEmail;
 })();
 """
 
