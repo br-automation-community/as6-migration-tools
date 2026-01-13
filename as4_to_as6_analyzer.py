@@ -147,6 +147,9 @@ def main():
         check_mapp_version(
             apj_path, log, args.verbose
         )  # mappService/mapp version issues
+        check_mapp_control(
+            apj_path, log, args.verbose
+        )  # MT* libraries requiring mappControl upgrade
         check_scene_viewer(
             apj_path, log, args.verbose
         )  # Scene Viewer usage & requirements
