@@ -146,7 +146,7 @@ class ModernMigrationGUI:
         file_btn = self.menubar.add_cascade("File")
         file_dropdown = CustomDropdownMenu(widget=file_btn)
         file_dropdown.add_option("Browse AS4 project", self.browse_folder)
-        self.save_log_option = file_dropdown.add_option("Save as HTML", self.save_log)
+        self.save_log_option = file_dropdown.add_option("View Report", self.save_log)
         file_dropdown.add_separator()
         file_dropdown.add_option("Exit", self.root.quit)
 
@@ -403,7 +403,7 @@ class ModernMigrationGUI:
         # Export button
         self.save_button = ctk.CTkButton(
             frame,
-            text="Save as HTML",
+            text="View Report",
             command=self.save_log,
             state="disabled",
             fg_color=B_R_BLUE,
@@ -959,7 +959,7 @@ class ModernMigrationGUI:
         css = """
 :root {
     --bg: #0f172a;
-    --bg-card: rgba(30, 41, 59, 0.8);
+    --bg-card: rgba(30, 41, 59, 0.95);
     --bg-card-solid: #1e293b;
     --fg: #e2e8f0;
     --fg-muted: #94a3b8;
@@ -968,11 +968,11 @@ class ModernMigrationGUI:
     --accent: #3b82f6;
     --accent-hover: #60a5fa;
     --error: #ef4444;
-    --error-bg: rgba(239, 68, 68, 0.1);
+    --error-bg: rgba(239, 68, 68, 0.18);
     --warning: #f59e0b;
-    --warning-bg: rgba(245, 158, 11, 0.1);
+    --warning-bg: rgba(245, 158, 11, 0.18);
     --info: #22c55e;
-    --info-bg: rgba(34, 197, 94, 0.1);
+    --info-bg: rgba(34, 197, 94, 0.18);
     --success: #10b981;
     --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.2);
     --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -4px rgba(0, 0, 0, 0.2);
@@ -981,15 +981,18 @@ class ModernMigrationGUI:
 /* Light mode */
 [data-theme="light"] {
     --bg: #f8fafc;
-    --bg-card: rgba(255, 255, 255, 0.9);
+    --bg-card: rgba(255, 255, 255, 0.98);
     --bg-card-solid: #ffffff;
     --fg: #1e293b;
     --fg-muted: #64748b;
     --border: rgba(0, 0, 0, 0.1);
     --border-hover: rgba(0, 0, 0, 0.2);
-    --error-bg: rgba(239, 68, 68, 0.08);
-    --warning-bg: rgba(245, 158, 11, 0.08);
-    --info-bg: rgba(34, 197, 94, 0.08);
+    --error: #dc2626;
+    --error-bg: rgba(239, 68, 68, 0.12);
+    --warning: #b45309;
+    --warning-bg: rgba(245, 158, 11, 0.12);
+    --info: #15803d;
+    --info-bg: rgba(34, 197, 94, 0.12);
     --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
     --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
 }
@@ -997,15 +1000,18 @@ class ModernMigrationGUI:
 @media (prefers-color-scheme: light) {
     :root:not([data-theme="dark"]) {
         --bg: #f8fafc;
-        --bg-card: rgba(255, 255, 255, 0.9);
+        --bg-card: rgba(255, 255, 255, 0.98);
         --bg-card-solid: #ffffff;
         --fg: #1e293b;
         --fg-muted: #64748b;
         --border: rgba(0, 0, 0, 0.1);
         --border-hover: rgba(0, 0, 0, 0.2);
-        --error-bg: rgba(239, 68, 68, 0.08);
-        --warning-bg: rgba(245, 158, 11, 0.08);
-        --info-bg: rgba(34, 197, 94, 0.08);
+        --error: #dc2626;
+        --error-bg: rgba(239, 68, 68, 0.12);
+        --warning: #b45309;
+        --warning-bg: rgba(245, 158, 11, 0.12);
+        --info: #15803d;
+        --info-bg: rgba(34, 197, 94, 0.12);
         --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
         --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
     }
@@ -1111,6 +1117,11 @@ body {
     color: var(--fg);
 }
 
+.theme-btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
 .theme-btn.active {
     background: var(--bg-card-solid);
     color: var(--fg);
@@ -1133,24 +1144,30 @@ body {
     padding: 8px 12px;
     border: 1px solid var(--border);
     border-radius: 6px;
-    background: var(--accent);
-    color: white;
+    background: transparent;
+    color: var(--fg-muted);
     font-size: 0.8rem;
-    font-weight: 600;
+    font-weight: 500;
     cursor: pointer;
     transition: all 0.15s ease;
     text-decoration: none;
 }
 
 .email-btn:hover {
-    background: var(--accent-hover);
+    background: var(--bg-card-solid);
+    border-color: var(--border-hover);
+    color: var(--fg);
     text-decoration: none;
-    color: white;
+}
+
+.email-btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
 }
 
 .email-btn svg {
-    width: 16px;
-    height: 16px;
+    width: 14px;
+    height: 14px;
 }
 
 .sidebar-meta a {
@@ -1196,17 +1213,28 @@ body {
 /* Summary badges */
 .summary-badges {
     display: flex;
-    gap: 6px;
-    margin-top: 10px;
+    gap: 8px;
+    margin-top: 12px;
 }
 
 .summary-badge {
     flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
     text-align: center;
-    padding: 6px 4px;
-    border-radius: 6px;
+    padding: 10px 6px;
+    border-radius: 8px;
     font-size: 11px;
     font-weight: 600;
+}
+
+.badge-icon {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
 }
 
 .summary-badge.error {
@@ -1464,6 +1492,11 @@ details[open] .section-chevron {
     border-color: var(--success);
 }
 
+.finding-checkbox:focus-visible + .finding-check {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
 .finding-checkbox:checked + .finding-check .icon {
     opacity: 1;
     transform: scale(1);
@@ -1615,14 +1648,14 @@ a:hover {
         return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
     }
     
-    function setTheme(theme) {
-        if (theme === 'auto') {
-            document.documentElement.removeAttribute('data-theme');
-        } else {
-            document.documentElement.setAttribute('data-theme', theme);
-        }
-        localStorage.setItem(THEME_KEY, theme);
+    function applyTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
         updateThemeButtons(theme);
+    }
+    
+    function setTheme(theme) {
+        localStorage.setItem(THEME_KEY, theme);
+        applyTheme(theme);
     }
     
     function updateThemeButtons(theme) {
@@ -1714,9 +1747,17 @@ a:hover {
             });
         });
         
-        // Initialize theme
-        const savedTheme = localStorage.getItem(THEME_KEY) || 'auto';
-        setTheme(savedTheme);
+        // Initialize theme - use saved preference or fall back to system preference
+        const savedTheme = localStorage.getItem(THEME_KEY);
+        const activeTheme = savedTheme || getSystemTheme();
+        applyTheme(activeTheme);
+        
+        // Listen for system theme changes (only affects users without saved preference)
+        window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => {
+            if (!localStorage.getItem(THEME_KEY)) {
+                applyTheme(getSystemTheme());
+            }
+        });
         
         // Theme toggle buttons
         document.querySelectorAll('.theme-btn').forEach(btn => {
@@ -1753,11 +1794,7 @@ a:hover {
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
                 Light
             </button>
-            <button class="theme-btn active" data-theme="auto" title="Auto (system)">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 0 0 20V2z" fill="currentColor"/></svg>
-                Auto
-            </button>
-            <button class="theme-btn" data-theme="dark" title="Dark mode">
+            <button class="theme-btn active" data-theme="dark" title="Dark mode">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
                 Dark
             </button>
@@ -1774,9 +1811,9 @@ a:hover {
         </div>
         <div class="progress-text">0 of {total_findings} completed (0%)</div>
         <div class="summary-badges">
-            <div class="summary-badge error">{total_errors} Errors</div>
-            <div class="summary-badge warning">{total_warnings} Warnings</div>
-            <div class="summary-badge info">{total_info} Info</div>
+            <div class="summary-badge error"><svg class="badge-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg><span>{total_errors} Errors</span></div>
+            <div class="summary-badge warning"><svg class="badge-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 22h20L12 2z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12" y2="17.01"/></svg><span>{total_warnings} Warnings</span></div>
+            <div class="summary-badge info"><svg class="badge-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg><span>{total_info} Info</span></div>
         </div>
     </div>
     
