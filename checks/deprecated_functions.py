@@ -163,7 +163,11 @@ def process_st_c_file(file_path: Path, patterns: dict) -> list:
 
 
 def check_functions(logical_path: Path, log, verbose=False) -> None:
-    log("─" * 80 + "\nChecking for obsolete and deprecated FUBs and functions...")
+    log(
+        utils.section_header(
+            "functions", "Checking for obsolete and deprecated FUBs and functions..."
+        )
+    )
 
     check_obsolete_functions(logical_path, log, verbose)
 

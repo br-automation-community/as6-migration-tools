@@ -159,22 +159,18 @@ def main():
 
         # Finish up
 
-        log("─" * 80)
+        log(utils.section_header("summary", "Migration Summary"))
         log(
-            "After upgrading the Automation Studio 4 project:",
+            "After upgrading the Automation Studio 4 project:"
+            "\n\n - The Automation Runtime version, Visual Components version and Technology Package versions must still be set in Runtime versions dialog box."
+            "\n - To ensure correct functionality, it is mandatory to perform a Project / Clean up configuration or Project / Rebuild configuration with AS 6 for all configurations.",
             when="AS6",
             severity="INFO",
         )
-        log(
-            " - The Automation Runtime version, Visual Components version and Technology Package versions must still be set in Runtime versions dialog box."
-            "\n - To ensure correct functionality, it is mandatory to perform a Project / Clean up configuration or Project / Rebuild configuration with AS 6 for all configurations."
-        )
 
         end_time = time.time()
-        log(
-            "─" * 80
-            + f"\nScanning completed successfully in {end_time - start_time:.2f} seconds."
-        )
+        log("─" * 80)
+        log(f"Scanning completed successfully in {end_time - start_time:.2f} seconds.")
 
     except Exception as e:
         error_message = f"An unexpected error occurred: {str(e)}"

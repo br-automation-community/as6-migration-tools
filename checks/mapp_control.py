@@ -1,6 +1,7 @@
 import re
-from lxml import etree
 from pathlib import Path
+
+from lxml import etree
 
 from utils import utils
 
@@ -10,7 +11,7 @@ def check_mapp_control(apj_path: Path, log, verbose=False):
     Checks if the project uses legacy MT<xxx> libraries that are now part of mappControl.
     """
 
-    log("─" * 80 + "\nChecking mappControl usage...")
+    log(utils.section_header("mapp-control", "Checking mappControl usage..."))
 
     project_root = apj_path.parent
 

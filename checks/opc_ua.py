@@ -2,6 +2,8 @@ from pathlib import Path
 
 from lxml import etree
 
+from utils import utils
+
 
 def check_uad_files(root_dir: Path, log, verbose=False) -> None:
     """
@@ -10,7 +12,7 @@ def check_uad_files(root_dir: Path, log, verbose=False) -> None:
     Also checks hardware files for activation of deprecated OPC UA model 1.
     """
 
-    log("─" * 80 + "\nChecking OPC configuration...")
+    log(utils.section_header("opcua", "Checking OPC UA configuration..."))
 
     # Find misplaced and old opc ua files
     required_suffix = ("Connectivity", "OpcUA")

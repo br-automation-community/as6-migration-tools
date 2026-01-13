@@ -23,7 +23,7 @@ def _is_version_valid(letter: str, version: float) -> bool:
 
 
 def check_ar(physical_path: Path, log, verbose: bool = False) -> None:
-    log("─" * 80 + "\nChecking Automation Runtime...")
+    log(utils.section_header("ar", "Checking Automation Runtime..."))
 
     for file in physical_path.rglob("Cpu.pkg"):
         if not file.is_file():

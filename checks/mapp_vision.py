@@ -8,7 +8,11 @@ def check_vision_settings(apj_path: Path, log, verbose=False) -> None:
     """
     Checks for the presence of mappVision settings files in the specified directory.
     """
-    log("─" * 80 + "\nChecking mappVision version in project file...")
+    log(
+        utils.section_header(
+            "mapp-vision", "Checking mappVision version in project file..."
+        )
+    )
 
     # Check for mappVision line in the .apj file
     for line in utils.read_file(apj_path).splitlines():

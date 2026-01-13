@@ -1,6 +1,7 @@
 import re
-from lxml import etree
 from pathlib import Path
+
+from lxml import etree
 
 from utils import utils
 
@@ -65,7 +66,7 @@ def check_safety(apj_path: Path, log, verbose=False) -> None:
         Nothing
     """
 
-    log("─" * 80 + "\nChecking for safety...")
+    log(utils.section_header("safety", "Checking Safety system..."))
 
     found = check_safety_release(apj_path, log, verbose)
 

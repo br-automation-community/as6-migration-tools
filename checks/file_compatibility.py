@@ -1,6 +1,7 @@
 import re
-from lxml import etree
 from pathlib import Path
+
+from lxml import etree
 
 from utils import utils
 
@@ -13,14 +14,10 @@ def check_all_file_versions(project_path: Path, log, verbose: bool) -> None:
     results = utils.scan_files_parallel(project_path, [".apj"], check_file_version)
     results += utils.scan_files_parallel(physical_path, [".hw"], check_file_version)
     if results:
-        log(
-            "The following files are incompatible with the required version:",
-            severity="MANDATORY",
-        )
-        output = ""
+        output = "The following files are incompatible with the required version:"
         for file_path, version in results:
             output += f"\n- {file_path}: {version}"
-        log(output[1:])
+        log(output, severity="MANDATORY")
         log(
             "Please ensure these files are saved at least once with Automation Studio 4.12",
             severity="MANDATORY",
@@ -54,15 +51,13 @@ def check_for_referenced_files(project_path: Path, log, verbose=False) -> None:
     )
 
     if reference_files:
-        log(
+        output = (
             "Some files are converted to a new format in AS6. This may break references, "
-            "The following .pkg files contain file reference, make sure that the references are valid after converting to AS6:",
-            severity="WARNING",
+            "The following .pkg files contain file reference, make sure that the references are valid after converting to AS6:"
         )
-        output = ""
         for ref_file in reference_files:
             output += f"\n- {ref_file}"
-        log(output[1:])
+        log(output, severity="WARNING")
 
 
 def has_file_reference(file_path: Path) -> list:
@@ -92,7 +87,11 @@ def check_files_for_compatibility(project_path: Path, log, verbose=False) -> Non
     Validates that files have a minimum required version.
     Generates warning when files are converted to a new format in AS6 that may break references.
     """
-    log("─" * 80 + "\nChecking project and hardware files for compatibility...")
+    log(
+        utils.section_header(
+            "file-compat", "Checking project and hardware files for compatibility..."
+        )
+    )
 
     check_all_file_versions(project_path, log, verbose)
     check_for_referenced_files(project_path, log, verbose)

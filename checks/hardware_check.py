@@ -23,7 +23,7 @@ def process_hw_file(file_path: Path, hardware_dict: dict) -> list:
 
 
 def check_hardware(physical_path: Path, log, verbose=False) -> None:
-    log("─" * 80 + "\nChecking for invalid hardware...")
+    log(utils.section_header("hardware", "Checking for invalid hardware..."))
 
     unsupported_hardware = utils.load_discontinuation_info("unsupported_hw")
     hardware_results = utils.scan_files_parallel(
@@ -34,20 +34,16 @@ def check_hardware(physical_path: Path, log, verbose=False) -> None:
     )
 
     if hardware_results:
-        log(
-            "The following unsupported hardware were found:",
-            when="AS4",
-            severity="WARNING",
-        )
         grouped_results = {}
         for hardware_id, reason, file_path in hardware_results:
             config_name = file_path.parent.parts[-1]
             grouped_results.setdefault(config_name, set()).add((hardware_id, reason))
 
+        output = "The following unsupported hardware were found:"
         for config_name, entries in grouped_results.items():
             hw_list = ", ".join(f"{hw}" for hw, reason in sorted(entries))
-            output = f"Hardware configuration '{config_name}':\n{hw_list}"
-            log(output)
+            output += f"\n\nHardware configuration '{config_name}':\n{hw_list}"
+        log(output, when="AS4", severity="WARNING")
 
         if verbose:
             hw_reason_map = {}

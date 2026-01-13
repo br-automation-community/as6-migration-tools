@@ -1,6 +1,7 @@
 import re
-from lxml import etree
 from pathlib import Path
+
+from lxml import etree
 
 from utils import utils
 
@@ -9,7 +10,11 @@ def check_mapp_view(apj_path: Path, log, verbose=False):
     """
     Checks for the presence of mappView settings files in the specified directory.
     """
-    log("─" * 80 + "\nChecking mappView version in project file...")
+    log(
+        utils.section_header(
+            "mapp-view", "Checking mappView version in project file..."
+        )
+    )
 
     # Check for mappView line in the .apj file
     for line in utils.read_file(apj_path).splitlines():

@@ -13,6 +13,146 @@ from CTkMessagebox import CTkMessagebox
 
 _CACHED_LINKS = None
 
+# Section marker system for HTML report generation
+# Format: §§SECTION:id:title§§ - parsed by HTML generator to create collapsible sections
+SECTION_MARKER_START = "§§SECTION:"
+SECTION_MARKER_END = "§§"
+
+
+def section_header(section_id: str, title: str) -> str:
+    """
+    Creates a section header with a parseable marker for HTML report generation.
+    The marker is invisible in plain text output but allows the HTML generator
+    to split the log into collapsible, categorized sections.
+
+    Args:
+        section_id: Unique identifier for the section (e.g., 'hardware', 'libraries')
+        title: Human-readable title for the section (e.g., 'Checking for invalid hardware...')
+
+    Returns:
+        Formatted section header string with marker
+    """
+    return f"{'─' * 80}\n{SECTION_MARKER_START}{section_id}:{title}{SECTION_MARKER_END}"
+
+
+# Mapping of section IDs to display metadata (icon, order, category, display_title)
+SECTION_METADATA = {
+    "intro": {
+        "order": 0,
+        "category": "Project",
+        "icon": "folder",
+        "title": "Project Information",
+    },
+    "project": {
+        "order": 1,
+        "category": "Project",
+        "icon": "folder",
+        "title": "Project Path & Name",
+    },
+    "file-compat": {
+        "order": 2,
+        "category": "Project",
+        "icon": "file",
+        "title": "File Compatibility",
+    },
+    "ar": {
+        "order": 3,
+        "category": "Configuration",
+        "icon": "cpu",
+        "title": "Automation Runtime",
+    },
+    "opcua": {
+        "order": 4,
+        "category": "Configuration",
+        "icon": "network",
+        "title": "OPC UA Configuration",
+    },
+    "hardware": {
+        "order": 5,
+        "category": "Hardware",
+        "icon": "chip",
+        "title": "Hardware Modules",
+    },
+    "file-devices": {
+        "order": 6,
+        "category": "Configuration",
+        "icon": "database",
+        "title": "File Devices & FTP",
+    },
+    "libraries": {
+        "order": 7,
+        "category": "Software",
+        "icon": "book",
+        "title": "Libraries & Dependencies",
+    },
+    "functions": {
+        "order": 8,
+        "category": "Software",
+        "icon": "code",
+        "title": "Deprecated Functions & FUBs",
+    },
+    "access-security": {
+        "order": 9,
+        "category": "Security",
+        "icon": "shield",
+        "title": "Access & Security",
+    },
+    "safety": {
+        "order": 10,
+        "category": "Safety",
+        "icon": "alert-triangle",
+        "title": "Safety System",
+    },
+    "mapp-vision": {
+        "order": 11,
+        "category": "mapp",
+        "icon": "eye",
+        "title": "mapp Vision",
+    },
+    "mapp-view": {
+        "order": 12,
+        "category": "mapp",
+        "icon": "layout",
+        "title": "mapp View",
+    },
+    "mapp-wdk": {
+        "order": 13,
+        "category": "mapp",
+        "icon": "puzzle",
+        "title": "Widget Development Kit (WDK)",
+    },
+    "mapp-services": {
+        "order": 14,
+        "category": "mapp",
+        "icon": "server",
+        "title": "mapp Services",
+    },
+    "mapp-control": {
+        "order": 15,
+        "category": "mapp",
+        "icon": "sliders",
+        "title": "mapp Control",
+    },
+    "scene-viewer": {
+        "order": 16,
+        "category": "Visualization",
+        "icon": "box",
+        "title": "Scene Viewer",
+    },
+    "visual-components": {
+        "order": 17,
+        "category": "Visualization",
+        "icon": "monitor",
+        "title": "Visual Components",
+    },
+    "summary": {
+        "order": 99,
+        "category": "Summary",
+        "icon": "check-circle",
+        "title": "Migration Summary",
+    },
+}
+
 
 class ConsoleColors:
     RESET = "\x1b[0m"  # Reset all formatting
