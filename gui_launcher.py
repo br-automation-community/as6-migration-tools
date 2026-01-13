@@ -147,10 +147,6 @@ class ModernMigrationGUI:
         file_dropdown = CustomDropdownMenu(widget=file_btn)
         file_dropdown.add_option("Browse AS4 project", self.browse_folder)
         self.save_log_option = file_dropdown.add_option("Save as HTML", self.save_log)
-        # New menu item: send via Outlook
-        self.send_report_option = file_dropdown.add_option(
-            "Send via Outlook", self.send_report_outlook
-        )
         file_dropdown.add_separator()
         file_dropdown.add_option("Exit", self.root.quit)
 
@@ -177,202 +173,6 @@ class ModernMigrationGUI:
         state = "normal" if self.script_ran.get() else "disabled"
         self.save_button.configure(state=state)
         self.save_log_option.configure(state=state)
-        # New:
-        if hasattr(self, "send_button"):
-            self.send_button.configure(state=state)
-        if hasattr(self, "send_report_option"):
-            self.send_report_option.configure(state=state)
-
-    def _export_report_to_temp(self) -> Path:
-        """Render current report to a temp HTML file and return the path."""
-        from tempfile import gettempdir
-
-        project = self.selected_folder.get() or "project"
-        project_name = os.path.basename(project.rstrip("\\/")) or "project"
-        ts = datetime.now().strftime("%Y-%m-%d_%H%M%S")
-        filename = f"{project_name}_AS4_To_AS6_Migration_Report_{ts}.html"
-        out_path = Path(gettempdir()) / filename
-        html_content = self.generate_html_log()
-        out_path.write_text(html_content, encoding="utf-8")
-        return out_path
-
-    def _build_email_subject(self) -> str:
-        """Build a clean subject without error/warning/info counters."""
-        project = self.selected_folder.get() or ""
-        project_name = os.path.basename(project.rstrip("\\/")) if project else ""
-        if project_name:
-            return f"{project_name} - AS4 to AS6 Migration Report"
-        return "AS4 to AS6 Migration Report"
-
-    def _build_email_body_html(self) -> str:
-        """Short, Outlook-friendly HTML body. Full report is attached."""
-        repo_url = "https://github.com/br-automation-community/as6-migration-tools"
-        project = self.selected_folder.get() or "-"
-        raw = "".join(self.raw_log_buffer)
-        err = raw.count("[ERROR]") + raw.count("[MANDATORY]")
-        warn = raw.count("[WARNING]")
-        info = raw.count("[INFO]")
-        ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-        return f"""
-        <div style="font-family: Segoe UI, Arial, sans-serif; font-size: 12pt;">
-          <p><strong>AS4 to AS6 Migration Report</strong></p>
-          <p><strong>Project:</strong> {escape(project)}<br>
-             <strong>Generated:</strong> {escape(ts)}<br>
-             <strong>Summary:</strong> Errors: {err}, Warnings: {warn}, Info: {info}</p>
-          <p>Full HTML report is attached.<br>
-             Tool: <a href="{repo_url}">as6-migration-tools</a></p>
-        </div>
-        """
-
-    def _send_report_via_pywin32(self, report_path: Path, subject: str, body_html: str):
-        """Use pywin32 COM (if bundled) to open a draft with signature + attachment."""
-        import win32com.client  # requires pywin32
-
-        outlook = win32com.client.Dispatch("Outlook.Application")
-        mail = outlook.CreateItem(0)  # 0 = olMailItem
-        mail.Display()  # load user's default signature
-        signature_html = mail.HTMLBody or ""
-        mail.Subject = subject
-        mail.HTMLBody = body_html + signature_html
-        mail.Attachments.Add(str(report_path.resolve()))
-        # leave draft open
-
-    def _send_report_via_powershell(
-        self, report_path: Path, subject: str, body_html: str
-    ):
-        """Automate Outlook via PowerShell COM (works without pywin32 inside your exe)."""
-        import os
-        import subprocess
-        import tempfile
-
-        ps_script = r"""
-    $ErrorActionPreference = 'Stop'
-    $ol = New-Object -ComObject Outlook.Application
-    $mail = $ol.CreateItem(0)
-    $mail.Display()
-    $signature = $mail.HTMLBody
-    $mail.Subject  = $env:SUBJECT
-    $mail.HTMLBody = $env:BODY + $signature
-    $mail.Attachments.Add($env:ATTACH)
-    """
-
-        with tempfile.NamedTemporaryFile(
-            delete=False, suffix=".ps1", mode="w", encoding="utf-8-sig"
-        ) as f:
-            f.write(ps_script)
-            ps_path = f.name
-
-        env = os.environ.copy()
-        env["SUBJECT"] = subject
-        env["BODY"] = body_html
-        env["ATTACH"] = str(report_path.resolve())
-
-        exe = "powershell"
-        try:
-            subprocess.run(
-                [exe, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ps_path],
-                check=True,
-                env=env,
-                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-            )
-        except Exception:
-            exe = "pwsh"
-            subprocess.run(
-                [exe, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ps_path],
-                check=True,
-                env=env,
-                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-            )
-
-    def _send_report_via_outlook_cli(
-        self, report_path: Path, subject: str, body_html: str
-    ):
-        """Use Outlook command-line switches as last resort (body becomes plaintext)."""
-        import re
-        import shutil
-        import subprocess
-        from urllib.parse import quote
-
-        outlook = shutil.which("outlook.exe")
-        if not outlook:
-            raise RuntimeError("outlook.exe not found on PATH")
-
-        plain = re.sub(r"<[^>]+>", "", body_html)  # strip HTML
-        mailto = f"mailto:?subject={quote(subject)}&body={quote(plain)}"
-
-        subprocess.run(
-            [outlook, "/c", "ipm.note", "/m", mailto, "/a", str(report_path.resolve())],
-            check=True,
-        )
-
-    def send_report_outlook(self):
-        """Open an Outlook draft with the exported HTML report attached.
-        Tries: pywin32 COM → PowerShell COM → Outlook CLI.
-        """
-        # Guard: need content
-        if not self.raw_log_buffer and self.log_text.get("1.0", "end-1c").strip() == "":
-            messagebox.showwarning(
-                "No content", "Run a script before sending a report."
-            )
-            return
-
-        # Export report to a temp file
-        try:
-            report_path = self._export_report_to_temp()
-        except Exception as e:
-            import traceback
-
-            messagebox.showerror(
-                "Export failed",
-                f"Could not export report:\n{e}\n\n{traceback.format_exc()}",
-            )
-            return
-
-        try:
-            subject = self._build_email_subject()
-            body_html = self._build_email_body_html()
-        except Exception as e:
-            import traceback
-
-            messagebox.showerror(
-                "Build email failed",
-                f"Could not build email content:\n{e}\n\n{traceback.format_exc()}",
-            )
-            return
-
-        # 1) Try pywin32 COM
-        try:
-            self._send_report_via_pywin32(report_path, subject, body_html)
-            self.update_status(f"Outlook draft (pywin32) opened: {report_path.name}")
-            return
-        except Exception:
-            pass  # fall through
-
-        # 2) Try PowerShell COM (no pywin32 dependency at runtime)
-        try:
-            self._send_report_via_powershell(report_path, subject, body_html)
-            self.update_status(f"Outlook draft (PowerShell) opened: {report_path.name}")
-            return
-        except Exception as e_ps:
-            ps_err = str(e_ps)
-
-        # 3) Try Outlook CLI as last resort (plain body)
-        try:
-            self._send_report_via_outlook_cli(report_path, subject, body_html)
-            self.update_status(f"Outlook draft (CLI) opened: {report_path.name}")
-            return
-        except Exception as e_cli:
-            cli_err = str(e_cli)
-
-        # All failed
-        messagebox.showerror(
-            "Outlook not available",
-            "Could not open an Outlook draft via pywin32, PowerShell, or Outlook CLI.\n\n"
-            f"- PowerShell error: {ps_err if 'ps_err' in locals() else 'n/a'}\n"
-            f"- CLI error: {cli_err if 'cli_err' in locals() else 'n/a'}\n"
-            "Ensure classic Outlook (Win32) is installed. If you use the new Store 'Outlook', COM/CLI may not work.",
-        )
 
     def show_about(self):
         # Text + links (keep in English)
@@ -614,20 +414,6 @@ class ModernMigrationGUI:
         )
         self.save_button.pack(side="right")
 
-        # Send via Outlook button
-        self.send_button = ctk.CTkButton(
-            frame,
-            text="Send via Outlook",
-            command=self.send_report_outlook,
-            state="disabled",
-            fg_color=B_R_BLUE,
-            hover_color=HOVER_BLUE,
-            font=BUTTON_FONT,
-            height=36,
-            corner_radius=8,
-        )
-        self.send_button.pack(side="right", padx=(0, 10))
-
         self.script_ran.trace_add("write", self.toggle_save_buttons)
 
     def toggle_run_button(self, *args):
@@ -810,6 +596,7 @@ class ModernMigrationGUI:
         "check": '<svg class="icon icon-check" viewBox="0 0 20 20" fill="currentColor"><path d="M4 10l4 4 8-8" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>',
         "chevron": '<svg class="icon icon-chevron" viewBox="0 0 20 20" fill="currentColor"><path d="M6 8l4 4 4-4" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>',
         "folder": '<svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 5a2 2 0 012-2h3l2 2h5a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V5z"/></svg>',
+        "email": '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 6L12 13 2 6"/></svg>',
     }
 
     def save_log(self):
@@ -1335,6 +1122,37 @@ body {
     height: 12px;
 }
 
+/* Email button */
+.email-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    margin-top: 10px;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--accent);
+    color: white;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    text-decoration: none;
+}
+
+.email-btn:hover {
+    background: var(--accent-hover);
+    text-decoration: none;
+    color: white;
+}
+
+.email-btn svg {
+    width: 16px;
+    height: 16px;
+}
+
 .sidebar-meta a {
     color: var(--accent);
     text-decoration: none;
@@ -1813,6 +1631,39 @@ a:hover {
         });
     }
     
+    // Send email with report summary
+    function sendEmail() {
+        const projectPath = document.querySelector('.header-meta')?.textContent || '';
+        const projectMatch = projectPath.match(/Project:\\s*([^|]+)/);
+        const projectName = projectMatch ? projectMatch[1].trim() : 'AS4 Project';
+        
+        // Get counts from summary badges
+        const errorBadge = document.querySelector('.summary-badge.error');
+        const warningBadge = document.querySelector('.summary-badge.warning');
+        const infoBadge = document.querySelector('.summary-badge.info');
+        
+        const errors = errorBadge ? errorBadge.textContent.match(/\\d+/)?.[0] || '0' : '0';
+        const warnings = warningBadge ? warningBadge.textContent.match(/\\d+/)?.[0] || '0' : '0';
+        const infos = infoBadge ? infoBadge.textContent.match(/\\d+/)?.[0] || '0' : '0';
+        
+        const subject = encodeURIComponent(`AS6 Migration Analysis Report - ${projectName}`);
+        const body = encodeURIComponent(
+            `AS6 Migration Analysis Summary\\n` +
+            `\\n` +
+            `Project: ${projectName}\\n` +
+            `\\n` +
+            `Findings:\\n` +
+            `- Errors: ${errors}\\n` +
+            `- Warnings: ${warnings}\\n` +
+            `- Information: ${infos}\\n` +
+            `\\n` +
+            `Please attach the full HTML report to this email.\\n` +
+            `The report file is located at: ${window.location.href}\\n`
+        );
+        
+        window.location.href = `mailto:?subject=${subject}&body=${body}`;
+    }
+    
     // Initialize
     document.addEventListener('DOMContentLoaded', function() {
         const state = loadState();
@@ -1908,6 +1759,10 @@ a:hover {
                 Dark
             </button>
         </div>
+        <button class="email-btn" onclick="sendEmail()" title="Send report summary via email">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 6L12 13 2 6"/></svg>
+            Send Email
+        </button>
     </div>
     
     <div class="progress-summary">
