@@ -46,8 +46,10 @@ def check_access_security(physical_path: Path, log, verbose: bool = False):
       3) Scan all .hw for AnslAuthentication=1 and warn before transfer.
     """
     log(
-        "─" * 80
-        + "\nChecking Access & Security (UserRoleSystem + ANSL authentication)..."
+        utils.section_header(
+            "access-security",
+            "Checking Access & Security (UserRoleSystem + ANSL authentication)...",
+        )
     )
 
     # (1) Global reminder about changed hashing algorithm in AS6

@@ -1,6 +1,7 @@
 import re
-from lxml import etree
 from pathlib import Path
+
+from lxml import etree
 
 from utils import utils
 
@@ -10,7 +11,11 @@ def check_mapp_version(apj_path: Path, log, verbose=False) -> None:
     Checks mapp Services / mappMotion versions in the .apj. Respects referenced packages in cpu.pkg.
     """
 
-    log("─" * 80 + "\nChecking mapp configuration in project file...")
+    log(
+        utils.section_header(
+            "mapp-services", "Checking mapp configuration in project file..."
+        )
+    )
 
     # --- Read .apj as plain text (robust vs. namespaces/BOM) ---
     txt = utils.read_file(apj_path)

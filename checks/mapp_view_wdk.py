@@ -13,9 +13,12 @@ Action:
 """
 
 from enum import Enum
-from lxml import etree
 from pathlib import Path
 from typing import Iterator, Optional
+
+from lxml import etree
+
+from utils import utils
 
 
 class WidgetLibraryType(Enum):
@@ -114,8 +117,11 @@ def check_widget_lib_usage(logical_path: Path, log, verbose: bool = False) -> No
     - Include a community link for WDTC migration info.
     - Log path to the library folder.
     """
-    if verbose:
-        log("Checking for legacy mappView WDK and User widget library usage...")
+    log(
+        utils.section_header(
+            "mapp-wdk", "Checking mappView Widget Development Kit (WDK) usage..."
+        )
+    )
 
     widgets_roots = list(_find_widgets_roots(logical_path))
     if not widgets_roots:
