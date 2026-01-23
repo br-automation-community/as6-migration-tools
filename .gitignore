@@ -187,3 +187,5 @@ cython_debug/
 .idea/dictionaries
 .idea/shelf
 
+# User settings
+update_state.json
