@@ -1775,7 +1775,7 @@ Examples:
         help="Disable equals to assignment conversion",
     )
 
-    return parser.parse_args()
+    return parser.parse_known_args()[0]
 
 
 def apply_config_from_args(args):
