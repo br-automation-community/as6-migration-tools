@@ -174,6 +174,29 @@ STRING_TO_ADR_FUNC_WHITELIST: list[str] = [
 ]
 
 
+def read_latin1(file_path: Path) -> str:
+    """
+    Read file content using ISO-8859-1 (Latin-1) encoding.
+    This preserves German umlauts and other extended ASCII characters
+    that are common in B&R Automation Studio AB files.
+    Falls back to charset detection if Latin-1 decoding fails.
+    """
+    try:
+        return file_path.read_text(encoding="iso-8859-1")
+    except Exception:
+        # Fallback to charset detection
+        return utils.read_file(file_path)
+
+
+def sanitize_latin1(text: str) -> str:
+    """
+    Sanitize text for ISO-8859-1 (Latin-1) encoding by replacing characters
+    that cannot be encoded (like the Unicode replacement character U+FFFD)
+    with a safe placeholder '?'.
+    """
+    return text.replace("\ufffd", "?")
+
+
 def rename_file(file_path: Path) -> Path | None:
     # Adjust references in IEC.prg if it exists
     iec_file = file_path.parent / "IEC.prg"
@@ -190,7 +213,7 @@ def rename_file(file_path: Path) -> Path | None:
         r"(?i)(\b[\w/\\.-]+)\.ab\b", lambda m: m.group(1) + ".st", text
     )
     if count:
-        iec_file.write_text(new_text, encoding="iso-8859-1")
+        iec_file.write_text(sanitize_latin1(new_text), encoding="iso-8859-1")
         utils.log(f"{count} IEC references updated in: {iec_file}", severity="INFO")
 
     new_file_path = file_path.with_suffix(".st")
@@ -213,7 +236,7 @@ def fix_comment(file_path: Path):
       - and replace all ';' with '//' anywhere (legacy behavior).
     """
     original_hash = utils.calculate_file_hash(file_path)
-    original_content = utils.read_file(file_path)
+    original_content = read_latin1(file_path)
 
     lines = original_content.splitlines(keepends=True)
     new_lines: list[str] = []
@@ -348,7 +371,9 @@ def fix_comment(file_path: Path):
     if modified_content != original_content:
         # Keep content normalized to '\n', but write as CRLF for Windows/AS compatibility.
         # This also avoids producing '\r\r\n' because our content contains no '\r'.
-        file_path.write_text(modified_content, encoding="iso-8859-1", newline="\r\n")
+        file_path.write_text(
+            sanitize_latin1(modified_content), encoding="iso-8859-1", newline="\r\n"
+        )
 
         new_hash = utils.calculate_file_hash(file_path)
         if original_hash == new_hash:
@@ -372,7 +397,7 @@ def fix_manual(file_path: Path) -> int:
     if not KEYWORD_MANUAL_FIX:
         return 0
 
-    original = utils.read_file(file_path)
+    original = read_latin1(file_path)
     lines = original.splitlines(keepends=True)
     new_lines: list[str] = []
     total = 0
@@ -414,7 +439,7 @@ def fix_manual(file_path: Path) -> int:
         new_lines.append(line)
 
     if total:
-        file_path.write_text("".join(new_lines), encoding="iso-8859-1")
+        file_path.write_text(sanitize_latin1("".join(new_lines)), encoding="iso-8859-1")
         utils.log(
             f"{total} manual fix notices added in: {file_path}", severity="WARNING"
         )
@@ -433,7 +458,7 @@ def fix_keywords(file_path: Path, replacements: dict[str, str] | None = None) ->
     if not replacements:
         return 0
 
-    original_content = utils.read_file(file_path)
+    original_content = read_latin1(file_path)
     modified = original_content
     total_replacements = 0
 
@@ -451,7 +476,7 @@ def fix_keywords(file_path: Path, replacements: dict[str, str] | None = None) ->
         total_replacements += count
 
     if total_replacements:
-        file_path.write_text(modified, encoding="iso-8859-1")
+        file_path.write_text(sanitize_latin1(modified), encoding="iso-8859-1")
         utils.log(
             f"{total_replacements} keyword replacements in: {file_path}",
             severity="INFO",
@@ -472,7 +497,7 @@ def fix_upper_case(file_path: Path, keywords: list[str] | None = None) -> int:
     if not keywords:
         return 0
 
-    original = utils.read_file(file_path)
+    original = read_latin1(file_path)
     lines = original.splitlines(keepends=True)
     new_lines: list[str] = []
     total = 0
@@ -538,7 +563,7 @@ def fix_upper_case(file_path: Path, keywords: list[str] | None = None) -> int:
         new_lines.append(modified_code + comment)
 
     if total:
-        file_path.write_text("".join(new_lines), encoding="iso-8859-1")
+        file_path.write_text(sanitize_latin1("".join(new_lines)), encoding="iso-8859-1")
         utils.log(f"{total} upper-case replacements in: {file_path}", severity="INFO")
 
     return total
@@ -551,7 +576,7 @@ def fix_numbers(file_path: Path) -> int:
     with the `2#1010` notation. Uses word-boundary matching so trailing characters
     are not accidentally captured. Returns number of replacements.
     """
-    original = utils.read_file(file_path)
+    original = read_latin1(file_path)
     total_count = 0
 
     # Match '$' followed by one or more hex digits, followed by a word boundary
@@ -565,7 +590,7 @@ def fix_numbers(file_path: Path) -> int:
     total_count += bin_count
 
     if total_count:
-        file_path.write_text(modified, encoding="iso-8859-1")
+        file_path.write_text(sanitize_latin1(modified), encoding="iso-8859-1")
         if hex_count and bin_count:
             utils.log(
                 f"{hex_count} hex ($ -> 16#) and {bin_count} binary (% -> 2#) conversions in: {file_path}",
@@ -590,7 +615,7 @@ def fix_math_functions(file_path: Path) -> int:
     Only performs replacement when the INC/DEC is the only code on that line (ignoring trailing comments and spaces).
     Returns the number of replacements made.
     """
-    original = utils.read_file(file_path)
+    original = read_latin1(file_path)
     lines = original.splitlines(keepends=True)
     new_lines: list[str] = []
     total = 0
@@ -650,7 +675,7 @@ def fix_math_functions(file_path: Path) -> int:
         new_lines.append(line)
 
     if total:
-        file_path.write_text("".join(new_lines), encoding="iso-8859-1")
+        file_path.write_text(sanitize_latin1("".join(new_lines)), encoding="iso-8859-1")
         utils.log(f"{total} INC/DEC conversions in: {file_path}", severity="INFO")
 
     return total
@@ -672,7 +697,7 @@ def fix_select(file_path: Path) -> int:
     Returns total number of replacements. If at least one replacement happens,
     the file is rewritten in 'iso-8859-1'.
     """
-    original = utils.read_file(file_path)
+    original = read_latin1(file_path)
     lines = original.splitlines(keepends=True)
 
     new_lines: list[str] = []
@@ -750,7 +775,7 @@ def fix_select(file_path: Path) -> int:
         new_lines.append(line)
 
     if total:
-        file_path.write_text("".join(new_lines), encoding="iso-8859-1")
+        file_path.write_text(sanitize_latin1("".join(new_lines)), encoding="iso-8859-1")
         utils.log(
             f"{total} SELECT/STATE/WHEN/NEXT transformations in: {file_path}",
             severity="INFO",
@@ -778,7 +803,7 @@ def fix_equals(
     if ignore_pairs is None:
         ignore_pairs = IGNORE_EQUALS_PAIRS
 
-    original_content = utils.read_file(file_path)
+    original_content = read_latin1(file_path)
 
     # Build patterns for start and end keywords
     start_patterns: list[tuple[str, re.Pattern]] = []
@@ -979,7 +1004,7 @@ def fix_equals(
         new_lines.append(new_line)
 
     if total:
-        file_path.write_text("".join(new_lines), encoding="iso-8859-1")
+        file_path.write_text(sanitize_latin1("".join(new_lines)), encoding="iso-8859-1")
         utils.log(f"{total} equals replaced by ':=' in: {file_path}", severity="INFO")
 
     return total
@@ -1011,7 +1036,7 @@ def fix_semicolon(file_path: Path, ignore_keywords: list[str] | None = None) -> 
         pattern = r"\b(" + "|".join(re.escape(k) for k in ignore_keywords) + r")\b"
         ignore_pattern = re.compile(pattern, flags=re.IGNORECASE)
 
-    original = utils.read_file(file_path)
+    original = read_latin1(file_path)
     lines = original.splitlines(keepends=True)
     new_lines: list[str] = []
     total = 0
@@ -1109,7 +1134,7 @@ def fix_semicolon(file_path: Path, ignore_keywords: list[str] | None = None) -> 
     content_to_write = trimmed
 
     if content_to_write != original:
-        file_path.write_text(content_to_write, encoding="iso-8859-1")
+        file_path.write_text(sanitize_latin1(content_to_write), encoding="iso-8859-1")
         utils.log(f"{total} semicolons added in: {file_path}", severity="INFO")
         if content != content_to_write:
             utils.log(
@@ -1127,7 +1152,7 @@ def fix_functionblocks(file_path: Path) -> int:
     Existing end-of-line comments (// ...) remain unchanged.
     Returns the number of modified lines.
     """
-    original_content = utils.read_file(file_path)
+    original_content = read_latin1(file_path)
     lines = original_content.splitlines(keepends=True)
     new_lines: list[str] = []
     total = 0
@@ -1173,7 +1198,7 @@ def fix_functionblocks(file_path: Path) -> int:
             new_lines.append(line)
 
     if total:
-        file_path.write_text("".join(new_lines), encoding="iso-8859-1")
+        file_path.write_text(sanitize_latin1("".join(new_lines)), encoding="iso-8859-1")
         utils.log(
             f"{total} lines updated by fix_functionblocks in: {file_path}",
             severity="INFO",
@@ -1200,7 +1225,7 @@ def fix_string_assignment_conditional_adr(file_path: Path) -> int:
     Preserves indentation, spacing, semicolons, and trailing '//' comments.
     Returns the number of modified lines (including inserted warnings).
     """
-    original = utils.read_file(file_path)
+    original = read_latin1(file_path)
     lines = original.splitlines(keepends=True)
     new_lines: list[str] = []
     total = 0
@@ -1328,7 +1353,7 @@ def fix_string_assignment_conditional_adr(file_path: Path) -> int:
         total += 1
 
     if total:
-        file_path.write_text("".join(new_lines), encoding="iso-8859-1")
+        file_path.write_text(sanitize_latin1("".join(new_lines)), encoding="iso-8859-1")
         utils.log(
             f"{total} conditional ADR conversions/warnings in: {file_path}",
             severity="INFO",
@@ -1361,7 +1386,7 @@ def fix_string_to_adr_in_whitelisted_funcs(
     if not func_whitelist:
         return 0
 
-    original = utils.read_file(file_path)
+    original = read_latin1(file_path)
     lines = original.splitlines(keepends=True)
     new_lines: list[str] = []
     total = 0
@@ -1468,7 +1493,7 @@ def fix_string_to_adr_in_whitelisted_funcs(
             new_lines.append(line)
 
     if total:
-        file_path.write_text("".join(new_lines), encoding="iso-8859-1")
+        file_path.write_text(sanitize_latin1("".join(new_lines)), encoding="iso-8859-1")
         utils.log(
             f"{total} ADR conversions for whitelisted function arguments in: {file_path}",
             severity="INFO",
@@ -1489,7 +1514,7 @@ def fix_exitif(file_path: Path) -> int:
     - Preserves newline characters
     - Returns number of lines modified
     """
-    original = utils.read_file(file_path)
+    original = read_latin1(file_path)
     lines = original.splitlines(keepends=True)
     new_lines: list[str] = []
     total = 0
@@ -1544,7 +1569,7 @@ def fix_exitif(file_path: Path) -> int:
         total += 1
 
     if total:
-        file_path.write_text("".join(new_lines), encoding="iso-8859-1")
+        file_path.write_text(sanitize_latin1("".join(new_lines)), encoding="iso-8859-1")
         utils.log(
             f"{total} EXITIF rewrites to 'IF ... THEN' in: {file_path}", severity="INFO"
         )
@@ -1566,9 +1591,9 @@ def fix_loop(file_path: Path) -> int:
       // Use REPEAT...END_REPEAT or WHILE...END_WHILE instead.
 
     Comments are not modified. Returns the number of changes made
-    (replacements + inserted comment lines).
+        (replacements + inserted comment lines).
     """
-    original = utils.read_file(file_path)
+    original = read_latin1(file_path)
     lines = original.splitlines(keepends=True)
     new_lines: list[str] = []
     conversions = 0
@@ -1637,7 +1662,7 @@ def fix_loop(file_path: Path) -> int:
 
     total_changes = conversions + warnings
     if total_changes:
-        file_path.write_text("".join(new_lines), encoding="iso-8859-1")
+        file_path.write_text(sanitize_latin1("".join(new_lines)), encoding="iso-8859-1")
         utils.log(
             f"{conversions} LOOP/ENDLOOP conversions, {warnings} warnings inserted in: {file_path}",
             severity="INFO",
