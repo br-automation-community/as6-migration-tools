@@ -102,15 +102,34 @@ class ModernMigrationGUI:
         self.spinner_index = 0
 
         self.scripts = {
-            "Evaluate AS4 project": self.resource_path("as4_to_as6_analyzer.py"),
-            "AsMathToAsBrMath": self.resource_path("helpers/asmath_to_asbrmath.py"),
-            "AsStringToAsBrStr": self.resource_path("helpers/asstring_to_asbrstr.py"),
-            "OpcUa Update": self.resource_path("helpers/asopcua_update.py"),
-            "MappMotion Update": self.resource_path("helpers/mappmotion_update.py"),
-            "License checker": self.resource_path("helpers/license_checker.py"),
-            "Convert Automation Basic to Structured Text": self.resource_path(
-                "helpers/ab_2_st_converter.py"
-            ),
+            "Evaluate AS4 project": {
+                "path": self.resource_path("as4_to_as6_analyzer.py"),
+                "requires_project": True,
+            },
+            "AsMathToAsBrMath": {
+                "path": self.resource_path("helpers/asmath_to_asbrmath.py"),
+                "requires_project": True,
+            },
+            "AsStringToAsBrStr": {
+                "path": self.resource_path("helpers/asstring_to_asbrstr.py"),
+                "requires_project": True,
+            },
+            "OpcUa Update": {
+                "path": self.resource_path("helpers/asopcua_update.py"),
+                "requires_project": True,
+            },
+            "MappMotion Update": {
+                "path": self.resource_path("helpers/mappmotion_update.py"),
+                "requires_project": True,
+            },
+            "License checker": {
+                "path": self.resource_path("helpers/license_checker.py"),
+                "requires_project": True,
+            },
+            "Convert Automation Basic to Structured Text": {
+                "path": self.resource_path("helpers/ab_2_st_converter.py"),
+                "requires_project": False,
+            },
         }
 
         self.links = utils.load_file_info("links", "links")
@@ -452,7 +471,9 @@ class ModernMigrationGUI:
     def _worker_execute_script(self):
         self.clear_log()
         folder = self.selected_folder.get()
-        script = self.scripts.get(self.selected_script.get())
+        script_info = self.scripts.get(self.selected_script.get(), {})
+        script = script_info.get("path")
+        requires_project = script_info.get("requires_project", False)
         verbose = self.verbose_mode.get()
 
         original_stdout, original_stderr = sys.stdout, sys.stderr
@@ -463,7 +484,7 @@ class ModernMigrationGUI:
         error_message = None
         if not os.path.exists(folder):
             error_message = f"Folder does not exist: {folder}"
-        elif not self.is_valid_as4_project(folder):
+        elif requires_project and not self.is_valid_as4_project(folder):
             error_message = f"Folder is not a valid AS4 project: {folder}"
         elif not script or not os.path.exists(script):
             error_message = f"Script not found: {self.selected_script.get()}"

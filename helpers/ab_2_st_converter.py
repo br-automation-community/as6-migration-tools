@@ -1854,10 +1854,15 @@ def main():
     elif input_path.is_dir():
         # Directory mode
         project_path = input_path
-        apj_file = utils.get_and_check_project_file(project_path)
 
-        utils.log(f"Project path validated: {project_path}")
-        utils.log(f"Using project file: {apj_file}\n")
+        # Check for .apj file (optional - AB2ST converter can work on any directory)
+        apj_file = next(project_path.glob("*.apj"), None)
+        if apj_file:
+            utils.log(f"Project path validated: {project_path}")
+            utils.log(f"Using project file: {apj_file.name}\n")
+        else:
+            utils.log(f"Processing directory: {project_path}")
+            utils.log("No .apj file found - processing as standalone directory.\n")
 
         utils.log(
             "This script will convert all Automation Basic tasks into Structure Text tasks.",
@@ -1877,7 +1882,14 @@ def main():
             utils.log("Operation cancelled. No changes were made.", severity="WARNING")
             return
 
+        # Use Logical subdirectory if it exists, otherwise use the provided directory
         logical_path = project_path / "Logical"
+        if not logical_path.exists():
+            logical_path = project_path
+            utils.log(
+                f"No 'Logical' subdirectory found, searching in: {project_path}",
+                severity="INFO",
+            )
 
         # Loop through the files in the "Logical" directory and process .ab files
         total_changes = 0
