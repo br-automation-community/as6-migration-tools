@@ -450,24 +450,31 @@ def sanitize_latin1(text: str) -> str:
     return text.replace("\ufffd", "?")
 
 
-def rename_file(file_path: Path) -> Path | None:
-    # Adjust references in IEC.prg if it exists
+def rename_file(file_path: Path, require_iec: bool = False) -> Path | None:
+    # Adjust references in IEC.prg/IEC.lby if present.
+    # In standalone directory mode (no *.apj), IEC files might not exist and should not block renaming.
     iec_file = file_path.parent / "IEC.prg"
     if not iec_file.exists():
-        # Adjust references in IEC.lby if it exists
         iec_file = file_path.parent / "IEC.lby"
         if not iec_file.exists():
-            return None
+            if require_iec:
+                return None
+            utils.log(
+                f"IEC.prg/IEC.lby not found next to {file_path.name} - skipping IEC reference updates.",
+                severity="WARNING",
+            )
+            iec_file = None
 
-    text = iec_file.read_text(encoding="iso-8859-1")
+    if iec_file is not None:
+        text = iec_file.read_text(encoding="iso-8859-1")
 
-    # Replace filename suffixes like 'name.ab' with 'name.st' (word boundary, case-insensitive)
-    new_text, count = re.subn(
-        r"(?i)(\b[\w/\\.-]+)\.ab\b", lambda m: m.group(1) + ".st", text
-    )
-    if count:
-        iec_file.write_text(sanitize_latin1(new_text), encoding="iso-8859-1")
-        utils.log(f"{count} IEC references updated in: {iec_file}", severity="INFO")
+        # Replace filename suffixes like 'name.ab' with 'name.st' (word boundary, case-insensitive)
+        new_text, count = re.subn(
+            r"(?i)(\b[\w/\\.-]+)\.ab\b", lambda m: m.group(1) + ".st", text
+        )
+        if count:
+            iec_file.write_text(sanitize_latin1(new_text), encoding="iso-8859-1")
+            utils.log(f"{count} IEC references updated in: {iec_file}", severity="INFO")
 
     new_file_path = file_path.with_suffix(".st")
     if new_file_path != file_path:
@@ -1924,7 +1931,7 @@ def fix_loop(file_path: Path) -> int:
     return total_changes
 
 
-def process_file(file_path: Path) -> int:
+def process_file(file_path: Path, require_iec: bool = False) -> int:
     """Process a single .ab or .st file through all conversion functions.
     Returns the total number of changes made."""
     total_changes = 0
@@ -1935,7 +1942,7 @@ def process_file(file_path: Path) -> int:
 
     # If it's a .ab file, rename it first
     if file_path.suffix == ".ab":
-        new_path = rename_file(file_path)
+        new_path = rename_file(file_path, require_iec=require_iec)
         if new_path is None:
             utils.log(
                 f"IEC.prg or IEC.lby not found in directory: {file_path.parent}",
@@ -2101,7 +2108,7 @@ def main():
             "Before proceeding, make sure you have a backup or are using version control (e.g., Git).",
             severity="WARNING",
         )
-        total = process_file(input_path)
+        total = process_file(input_path, require_iec=False)
         utils.log(f"File processing complete. Total changes: {total}", severity="INFO")
 
     elif input_path.is_dir():
@@ -2116,6 +2123,8 @@ def main():
         else:
             utils.log(f"Processing directory: {project_path}")
             utils.log("No .apj file found - processing as standalone directory.\n")
+
+        require_iec = apj_file is not None
 
         utils.log(
             "This script will convert all Automation Basic tasks into Structure Text tasks.",
@@ -2150,7 +2159,7 @@ def main():
         files_processed = 0
         for file_path in logical_path.rglob("*"):
             if file_path.suffix in {".ab"}:
-                total_changes += process_file(file_path)
+                total_changes += process_file(file_path, require_iec=require_iec)
                 files_processed += 1
 
         utils.log(
