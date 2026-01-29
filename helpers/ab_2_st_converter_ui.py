@@ -140,6 +140,16 @@ def ask_proceed_with_options_gui(message: str) -> tuple[bool, dict[str, bool]]:
         result: dict[str, object] = {"proceed": False}
 
         def show_help():
+            url = "https://github.com/br-automation-community/as6-migration-tools/blob/main/helpers/ab_2_st_converter.md"
+            try:
+                import webbrowser
+
+                webbrowser.open_new(url)
+                return
+            except Exception:
+                pass
+
+            # Fallback: show bundled markdown text in-app
             help_win = ctk.CTkToplevel(win)
             help_win.title("Instructions")
             help_win.geometry("1000x760")
