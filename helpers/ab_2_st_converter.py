@@ -478,6 +478,19 @@ def rename_file(file_path: Path, require_iec: bool = False) -> Path | None:
 
     new_file_path = file_path.with_suffix(".st")
     if new_file_path != file_path:
+        if new_file_path.exists():
+            # If a previous conversion already produced a .st, keep it as a backup
+            # instead of failing with FileExistsError.
+            backup = new_file_path.with_name(new_file_path.name + ".bak")
+            n = 1
+            while backup.exists():
+                backup = new_file_path.with_name(new_file_path.name + f".bak{n}")
+                n += 1
+            new_file_path.rename(backup)
+            utils.log(
+                f"Existing output renamed to backup: {backup}",
+                severity="WARNING",
+            )
         file_path.rename(new_file_path)
         utils.log(
             f"Renamed file: {file_path} to {new_file_path}",
@@ -972,56 +985,143 @@ def fix_select(file_path: Path) -> int:
     next_prefix = re.compile(r"^(\s*)NEXT\b\s+(\S+)", flags=re.IGNORECASE)
 
     # WHEN can appear as 'WHEN(' or 'WHEN condition'. We match the prefix and then
-    # split the line into condition + tail using a tail pattern that tolerates:
-    #  - spaces
-    #  - optional comment ('//...' or '(*...*)') in either position relative to ';'
-    #  - optional semicolon
+    # split the line into condition + tail, preserving the original tail order.
+    # Tail may include an inline comment ('//...' or '(*...*)') and/or a trailing ';'
+    # in either order (e.g. '; //comment' or '(*c*) ;').
     when_prefix = re.compile(r"^(\s*)WHEN\b\s*", flags=re.IGNORECASE)
-    tail_re = re.compile(r"\s*(?:(//.*|\(\*.*?\*\)))?\s*(;)?\s*$")
 
-    for line in lines:
+    def _strip_eol(s: str) -> str:
+        return s.rstrip("\r\n")
+
+    def _remove_trailing_backslash(code_part: str) -> tuple[str, bool]:
+        s = code_part.rstrip()
+        had = False
+        while s.endswith("\\"):
+            had = True
+            s = s[:-1].rstrip()
+        return s, had
+
+    def _split_tail(text: str, *, drop_semicolon: bool = False) -> tuple[str, str]:
+        """Split `text` into (code_part, tail) by peeling tokens from the end.
+
+        Tail may contain, at the very end of the line, any combination of:
+        - line comment: '//...'
+        - block comment: '(* ... *)' (single line)
+        - semicolon: ';'
+        in either order (e.g. '; //c' or '(*c*) ;' or '; (*c*)').
+
+        If drop_semicolon=True, semicolon tokens are removed from the tail.
+        This is used for WHEN→IF header lines where ';' would be invalid.
+        """
+        tmp = text
+        tail = ""
+
+        # Iteratively peel from end: comment (if at end) and/or semicolon.
+        # We keep exact whitespace around the peeled tokens.
+        while True:
+            # Trailing line comment wins (captures everything to end).
+            m_line_c = re.search(r"\s*//.*$", tmp)
+            if m_line_c:
+                tail = tmp[m_line_c.start() :] + tail
+                tmp = tmp[: m_line_c.start()]
+                continue
+
+            # Trailing block comment.
+            m_block_c = re.search(r"\s*\(\*.*?\*\)\s*$", tmp)
+            if m_block_c:
+                tail = tmp[m_block_c.start() :] + tail
+                tmp = tmp[: m_block_c.start()]
+                continue
+
+            # Trailing semicolon.
+            m_sc = re.search(r"\s*;\s*$", tmp)
+            if m_sc:
+                if not drop_semicolon:
+                    tail = tmp[m_sc.start() :] + tail
+                tmp = tmp[: m_sc.start()]
+                continue
+
+            break
+
+        return tmp, tail
+
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+
         # SELECT
         m = sel_prefix.match(line)
         if m:
             leading, sel = m.group(1), m.group(2)
             current_select = sel
-            tail = line[m.end() :].rstrip(
-                "\r\n"
-            )  # preserve everything after the matched token
+            tail = _strip_eol(line[m.end() :])  # preserve everything after the matched token
             new_lines.append(f"{leading}CASE {sel} OF{tail}\n")
             total += 1
+            i += 1
             continue
 
         # STATE
         m = state_prefix.match(line)
         if m:
             leading, state = m.group(1), m.group(2)
-            tail = line[m.end() :].rstrip("\r\n")
+            tail = _strip_eol(line[m.end() :])
             new_lines.append(f"{leading}{state}:{tail}\n")
             total += 1
+            i += 1
             continue
 
-        # WHEN
+        # WHEN (supports multi-line conditions using trailing '\\')
         m = when_prefix.match(line)
         if m:
             leading = m.group(1)
-            # Find tail at end-of-line to isolate condition while keeping original tail order intact.
-            m_tail = tail_re.search(line)
-            # If tail pattern found, split condition/tail by indices; else, whole rest is condition.
-            tail_start = m_tail.start() if m_tail else len(line.rstrip("\n"))
-            cond = line[m.end() : tail_start].strip()
-            tail = line[tail_start:].rstrip("\r\n") if m_tail else ""
-            new_lines.append(f"{leading}IF {cond} THEN{tail}\n")
+            raw = _strip_eol(line)
+
+            # Split first WHEN line into condition + tail (preserve tail order)
+            cond_part_raw, tail_first = _split_tail(raw[m.end() :], drop_semicolon=True)
+
+            cond_part, cont = _remove_trailing_backslash(cond_part_raw)
+            cond_part = cond_part.strip()
+
+            cond_lines: list[tuple[str, str]] = []  # (line_text_without_eol, tail)
+            cond_lines.append((f"{leading}IF {cond_part}", tail_first))
+
+            # Consume continuation lines while the previous code part ended with '\\'
+            while cont and (i + 1) < len(lines):
+                i += 1
+                raw_next = _strip_eol(lines[i])
+
+                # Preserve indentation of continuation lines
+                m_ws = re.match(r"^(\s*)", raw_next)
+                next_leading = m_ws.group(1) if m_ws else ""
+
+                # Split continuation line into code/tail preserving tail order
+                after_ws = raw_next[len(next_leading) :]
+                cond_next_raw, tail_next = _split_tail(after_ws, drop_semicolon=True)
+
+                # Remove trailing '\\' from the code part (before any tail)
+                cond_next_code, cont = _remove_trailing_backslash(cond_next_raw)
+                cond_next_code = cond_next_code.strip()
+
+                cond_lines.append((f"{next_leading}{cond_next_code}", tail_next))
+
+            # Ensure THEN appears on the last condition line (not on the '\\' line)
+            last_text, last_tail = cond_lines[-1]
+            if not re.search(r"\bTHEN\b\s*$", last_text, flags=re.IGNORECASE):
+                last_text = f"{last_text} THEN"
+            cond_lines[-1] = (last_text, last_tail)
+
+            for text, tail in cond_lines:
+                new_lines.append(f"{text}{tail}\n")
+
             total += 1
+            i += 1
             continue
 
         # NEXT
         m = next_prefix.match(line)
         if m:
             leading, nxt = m.group(1), m.group(2)
-            tail = line[m.end() :].rstrip(
-                "\r\n"
-            )  # keep comment/semicolon order exactly
+            tail = _strip_eol(line[m.end() :])  # keep comment/semicolon order exactly
             if current_select:
                 new_lines.append(f"{leading}{current_select} := {nxt}{tail}\n")
                 new_lines.append(f"{leading}END_IF\n")
@@ -1029,10 +1129,12 @@ def fix_select(file_path: Path) -> int:
             else:
                 # no SELECT in scope — leave unchanged
                 new_lines.append(line)
+            i += 1
             continue
 
         # default: keep line unchanged
         new_lines.append(line)
+        i += 1
 
     if total:
         file_path.write_text(sanitize_latin1("".join(new_lines)), encoding="iso-8859-1")
@@ -1301,14 +1403,48 @@ def fix_semicolon(file_path: Path, ignore_keywords: list[str] | None = None) -> 
     new_lines: list[str] = []
     total = 0
 
+    # Track multi-line control-structure headers so we don't append semicolons to
+    # continuation lines between the opening keyword and its terminator.
+    # Example:
+    #   IF (a = 1) AND
+    #      (b = 2) THEN
+    # The continuation line must NOT get a trailing ';'.
+    header_terminator: str | None = None
+
+    header_start_patterns: list[tuple[re.Pattern, str]] = [
+        (re.compile(r"^\s*IF\b", flags=re.IGNORECASE), "THEN"),
+        (re.compile(r"^\s*ELSIF\b", flags=re.IGNORECASE), "THEN"),
+        (re.compile(r"^\s*WHILE\b", flags=re.IGNORECASE), "DO"),
+        (re.compile(r"^\s*FOR\b", flags=re.IGNORECASE), "DO"),
+    ]
+
+    def _update_header_state(code_part: str) -> None:
+        """Update header_terminator based on code_part (no inline '//' comment)."""
+        nonlocal header_terminator
+
+        # If we're already in a multi-line header, check whether this line ends it.
+        if header_terminator is not None:
+            if re.search(r"\b" + re.escape(header_terminator) + r"\b", code_part, flags=re.IGNORECASE):
+                header_terminator = None
+            return
+
+        # Not in a header: see if this line starts one that doesn't terminate on the same line.
+        for start_pat, terminator in header_start_patterns:
+            if start_pat.search(code_part):
+                # If the terminator is already present on the same line, it's a single-line header.
+                if not re.search(r"\b" + re.escape(terminator) + r"\b", code_part, flags=re.IGNORECASE):
+                    header_terminator = terminator
+                return
+
     def remove_trailing_backslash(code_part: str) -> tuple[str, bool]:
-        """
-        Remove a single trailing backslash from the code part (ignoring trailing spaces).
+        """Remove a single trailing backslash from the code part (ignoring trailing spaces).
+
         Returns (new_code_part, had_backslash).
         """
         s = code_part.rstrip()
-        had_backslash = s.endswith("\\")
-        if had_backslash:
+        had_backslash = False
+        while s.endswith("\\"):
+            had_backslash = True
             s = s[:-1].rstrip()
         return s, had_backslash
 
@@ -1332,8 +1468,11 @@ def fix_semicolon(file_path: Path, ignore_keywords: list[str] | None = None) -> 
             code_only_raw = before.rstrip()
             trailing_spaces = before[len(code_only_raw) :]
 
-            # NEW: detect & remove trailing backslash BEFORE ignore check
+            # Detect & remove trailing backslash BEFORE ignore check
             code_only, had_backslash = remove_trailing_backslash(code_only_raw)
+
+            # Update header tracking based on code part (without inline comment)
+            _update_header_state(code_only)
 
             # If the line matches ignore keywords -> do not add ';', but backslash is removed
             if ignore_pattern and ignore_pattern.search(line):
@@ -1342,11 +1481,13 @@ def fix_semicolon(file_path: Path, ignore_keywords: list[str] | None = None) -> 
 
             # Semicolon logic:
             # If a trailing '\' was detected, do NOT add ';'
+            # If we're inside a multi-line header (IF..THEN / WHILE..DO), do NOT add ';'
             if (
                 code_only == ""
                 or code_only.endswith(";")
                 or code_only.endswith(":")
                 or had_backslash
+                or header_terminator is not None
             ):
                 new_before = code_only + trailing_spaces
             else:
@@ -1367,8 +1508,11 @@ def fix_semicolon(file_path: Path, ignore_keywords: list[str] | None = None) -> 
                 newline = ""
                 content_raw = line
 
-            # NEW: detect & remove trailing backslash BEFORE ignore check
+            # Detect & remove trailing backslash BEFORE ignore check
             content, had_backslash = remove_trailing_backslash(content_raw)
+
+            # Update header tracking based on code part
+            _update_header_state(content)
 
             # If the line matches ignore keywords -> do not add ';', but backslash is removed
             if ignore_pattern and ignore_pattern.search(line):
@@ -1377,11 +1521,13 @@ def fix_semicolon(file_path: Path, ignore_keywords: list[str] | None = None) -> 
 
             # Semicolon logic:
             # If a trailing '\' was detected, do NOT add ';'
+            # If we're inside a multi-line header (IF..THEN / WHILE..DO), do NOT add ';'
             if (
                 content.strip() == ""
                 or content.endswith(";")
                 or content.endswith(":")
                 or had_backslash
+                or header_terminator is not None
             ):
                 new_lines.append(content + newline)
             else:
@@ -1937,7 +2083,7 @@ def process_file(file_path: Path, require_iec: bool = False) -> int:
     total_changes = 0
 
     # Log separator line before each file
-    utils.log("─" * 80, severity="INFO")
+    utils.log("-" * 80, severity="INFO")
     utils.log(f"Processing: {file_path}", severity="INFO")
 
     # If it's a .ab file, rename it first
