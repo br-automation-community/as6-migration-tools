@@ -424,17 +424,25 @@ def fix_manual(file_path: Path) -> int:
     new_lines: list[str] = []
     total = 0
 
-    # Precompile case-insensitive word-boundary patterns for each keyword
+    # Precompile case-insensitive word-boundary patterns for each keyword.
+    # Special-case function-like tokens ending with '(' so we also match optional
+    # whitespace before the opening parenthesis (e.g., 'USINT (x)').
     patterns = []
     for k, v in KEYWORD_MANUAL_FIX.items():
         if not k:
             continue
-        # Only add trailing \b if keyword ends with a word character
-        escaped = re.escape(k)
-        if re.search(r"\w$", k):
-            pat = re.compile(r"\b" + escaped + r"\b", flags=re.IGNORECASE)
+        # If keyword is like 'USINT(' (word + '('), allow optional whitespace
+        # before '(' to catch both 'USINT(x)' and 'USINT (x)'.
+        if k.endswith("(") and re.fullmatch(r"\w+\(", k):
+            token = k[:-1]
+            pat = re.compile(r"\b" + re.escape(token) + r"\s*\(", flags=re.IGNORECASE)
         else:
-            pat = re.compile(r"\b" + escaped, flags=re.IGNORECASE)
+            # Only add trailing \b if keyword ends with a word character
+            escaped = re.escape(k)
+            if re.search(r"\w$", k):
+                pat = re.compile(r"\b" + escaped + r"\b", flags=re.IGNORECASE)
+            else:
+                pat = re.compile(r"\b" + escaped, flags=re.IGNORECASE)
         patterns.append((k, pat, v))
 
     for line in lines:
@@ -1323,10 +1331,6 @@ def fix_equals(
         utils.log(f"{total} equals replaced by ':=' in: {file_path}", severity="INFO")
 
     return total
-
-
-from pathlib import Path
-import re
 
 
 def fix_semicolon(file_path: Path, ignore_keywords: list[str] | None = None) -> int:
