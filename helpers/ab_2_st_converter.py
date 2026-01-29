@@ -12,258 +12,10 @@ if str(ROOT) not in sys.path:
 
 from utils import utils
 
-
-def _get_converter_help_markdown_text() -> str:
-    try:
-        md_path = Path(__file__).resolve().parent / "ab_2_st_converter.md"
-        return md_path.read_text(encoding="utf-8", errors="replace")
-    except Exception:
-        return "Could not load ab_2_st_converter.md"
-
-
-def _conversion_checkbox_items() -> dict[str, str]:
-    # key -> label
-    return {
-        "manual": "Manual fix notices insertion",
-        "comment": "Comment conversion",
-        "keywords": "Keyword replacements",
-        "uppercase": "Uppercase conversion",
-        "numbers": "Number format conversion",
-        "select": "SELECT/STATE/WHEN/NEXT transformation",
-        "loop": "LOOP/ENDLOOP conversion",
-        "math": "INC/DEC conversion",
-        "exitif": "EXITIF conversion",
-        "semicolon": "Semicolon insertion",
-        "functionblocks": "Function block syntax fix",
-        "string_adr": "Conditional ADR wrapping for string assignments",
-        "string_adr_whitelist": "ADR wrapping in whitelisted function arguments",
-        "equals": "Equals to assignment conversion",
-    }
-
-
-def _apply_config_from_checkbox_selections(selections: dict[str, bool]) -> None:
-    global CONVERSION_CONFIG
-    for key in CONVERSION_CONFIG.keys():
-        if key in selections:
-            CONVERSION_CONFIG[key] = bool(selections[key])
-
-    disabled = [k for k, v in CONVERSION_CONFIG.items() if not v]
-    if disabled:
-        utils.log(f"Disabled conversions: {', '.join(disabled)}", severity="INFO")
-
-
-def _ask_proceed_with_options_gui(message: str) -> tuple[bool, dict[str, bool]]:
-    """CustomTkinter dialog styled like ModernMigrationGUI.
-
-    Returns: (proceed, selections)
-    """
-    try:
-        import threading
-        import tkinter as tk
-        import customtkinter as ctk
-    except Exception:
-        return False, {k: True for k in _conversion_checkbox_items().keys()}
-
-    # Match ModernMigrationGUI look & feel
-    B_R_BLUE = "#3B82F6"
-    HOVER_BLUE = "#2563EB"
-    LABEL_FONT = ("Segoe UI", 14, "bold")
-    FIELD_FONT = ("Segoe UI", 15)
-    BUTTON_FONT = ("Segoe UI", 14, "bold")
-    LOG_FONT = ("Consolas", 12)
-
-    items = _conversion_checkbox_items()
-
-    def _show_dialog(master) -> tuple[bool, dict[str, bool]]:
-        win = ctk.CTkToplevel(master)
-        win.withdraw()
-        win.title("AB → ST converter")
-        # Make the options window taller so all checkboxes fit without scrolling
-        win.geometry("900x760")
-        win.minsize(820, 700)
-
-        try:
-            win.transient(master)
-        except Exception:
-            pass
-
-        container = ctk.CTkFrame(win)
-        container.pack(fill="both", expand=True, padx=16, pady=16)
-
-        ctk.CTkLabel(
-            container,
-            text="Convert Automation Basic to Structured Text",
-            font=LABEL_FONT,
-        ).pack(anchor="w", pady=(0, 6))
-
-        ctk.CTkLabel(
-            container,
-            text=message,
-            justify="left",
-            wraplength=840,
-            font=FIELD_FONT,
-        ).pack(anchor="w", fill="x", pady=(0, 12))
-
-        opts = ctk.CTkFrame(container)
-        opts.pack(fill="both", expand=True, pady=(0, 12))
-
-        ctk.CTkLabel(opts, text="Options", font=LABEL_FONT).pack(
-            anchor="w", padx=10, pady=(10, 6)
-        )
-
-        # Increased height to avoid needing to scroll for the default option list
-        scroll = ctk.CTkScrollableFrame(opts, height=400)
-        scroll.pack(fill="both", expand=True, padx=10, pady=(0, 10))
-
-        vars_by_key: dict[str, ctk.BooleanVar] = {}
-        for key, text in items.items():
-            var = ctk.BooleanVar(value=True)
-            vars_by_key[key] = var
-            ctk.CTkCheckBox(
-                scroll,
-                text=text,
-                variable=var,
-                font=FIELD_FONT,
-            ).pack(anchor="w", padx=8, pady=6)
-
-        result: dict[str, object] = {"proceed": False}
-
-        def show_help():
-            help_win = ctk.CTkToplevel(win)
-            help_win.title("Instructions")
-            help_win.geometry("1000x760")
-            help_win.minsize(860, 620)
-            try:
-                help_win.transient(win)
-            except Exception:
-                pass
-            txt = ctk.CTkTextbox(help_win, wrap="word", font=LOG_FONT)
-            txt.pack(fill="both", expand=True, padx=16, pady=16)
-            txt.insert("1.0", _get_converter_help_markdown_text())
-            txt.configure(state="disabled")
-            help_win.focus_set()
-
-        def on_yes():
-            result["proceed"] = True
-            win.destroy()
-
-        def on_no():
-            result["proceed"] = False
-            win.destroy()
-
-        btn_row = ctk.CTkFrame(container, fg_color="transparent")
-        btn_row.pack(fill="x")
-
-        ctk.CTkButton(
-            btn_row,
-            text="Show instructions",
-            command=show_help,
-            fg_color="#444444",
-            hover_color="#555555",
-            font=BUTTON_FONT,
-            height=36,
-            corner_radius=8,
-        ).pack(side="left")
-
-        ctk.CTkButton(
-            btn_row,
-            text="No",
-            command=on_no,
-            fg_color="#444444",
-            hover_color="#555555",
-            font=BUTTON_FONT,
-            height=36,
-            corner_radius=8,
-            width=120,
-        ).pack(side="right", padx=(8, 0))
-
-        ctk.CTkButton(
-            btn_row,
-            text="Yes",
-            command=on_yes,
-            fg_color=B_R_BLUE,
-            hover_color=HOVER_BLUE,
-            font=BUTTON_FONT,
-            height=36,
-            corner_radius=8,
-            width=120,
-        ).pack(side="right")
-
-        def on_close():
-            result["proceed"] = False
-            win.destroy()
-
-        win.protocol("WM_DELETE_WINDOW", on_close)
-
-        # Center relative to master
-        try:
-            win.update_idletasks()
-            mw = master.winfo_width()
-            mh = master.winfo_height()
-            mx = master.winfo_rootx()
-            my = master.winfo_rooty()
-            w = win.winfo_reqwidth()
-            h = win.winfo_reqheight()
-            x = mx + max(0, (mw - w) // 2)
-            y = my + max(0, (mh - h) // 2)
-            win.geometry(f"{w}x{h}+{x}+{y}")
-        except Exception:
-            pass
-
-        win.deiconify()
-        win.grab_set()
-        win.focus_set()
-        win.wait_window()
-
-        selections = {k: bool(v.get()) for k, v in vars_by_key.items()}
-        return bool(result["proceed"]), selections
-
-    # If we are running under the ModernMigrationGUI, create the dialog on the UI thread.
-    master = getattr(tk, "_default_root", None)
-    if master is None:
-        # Standalone run: create our own CTk root.
-        ctk.set_default_color_theme("blue")
-        root = ctk.CTk()
-        root.withdraw()
-        try:
-            return _show_dialog(root)
-        finally:
-            try:
-                root.destroy()
-            except Exception:
-                pass
-
-    # GUI run: ensure UI thread creates widgets
-    done = threading.Event()
-    out: dict[str, tuple[bool, dict[str, bool]]] = {}
-
-    def _run_on_ui():
-        try:
-            out["result"] = _show_dialog(master)
-        finally:
-            done.set()
-
-    try:
-        master.after(0, _run_on_ui)
-        done.wait()
-        res = out.get("result")
-        if res is not None:
-            return res
-        return False, {k: True for k in items.keys()}
-    except Exception:
-        return False, {k: True for k in items.keys()}
-
-
-def _ask_proceed_with_options(message: str) -> tuple[bool, dict[str, bool]]:
-    """Prefer GUI (if available), otherwise fall back to terminal yes/no."""
-    try:
-        proceed, selections = _ask_proceed_with_options_gui(message)
-        return proceed, selections
-    except Exception:
-        # Terminal fallback keeps behavior similar to previous implementation
-        proceed = utils.ask_user(f"{message} (y/n) [y]: ", extra_note="Note:")
-        return (proceed == "y"), {k: True for k in _conversion_checkbox_items().keys()}
-
+from helpers.ab_2_st_converter_ui import (
+    apply_config_from_checkbox_selections,
+    ask_proceed_with_options,
+)
 
 # Global configuration for enabled conversion functions (set by CLI arguments)
 CONVERSION_CONFIG = {
@@ -273,6 +25,7 @@ CONVERSION_CONFIG = {
     "uppercase": True,
     "numbers": True,
     "select": True,
+    "case": True,
     "loop": True,
     "math": True,
     "exitif": True,
@@ -313,10 +66,6 @@ KEYWORD_REPLACEMENTS: dict[str, str] = {
     "ELSE IF": "ELSIF",
     "LSL(": "SHL(",
     "LSR(": "SHR(",
-    "ACTION": "",
-    "ENDACTION": "",
-    "ELSEACTION": "ELSE",
-    "ENDCASE": "END_CASE",
 }
 
 # List of keyword pairs (start, end) which define regions where '=' should NOT be
@@ -450,27 +199,47 @@ def sanitize_latin1(text: str) -> str:
     return text.replace("\ufffd", "?")
 
 
-def rename_file(file_path: Path) -> Path | None:
-    # Adjust references in IEC.prg if it exists
+def rename_file(file_path: Path, require_iec: bool = False) -> Path | None:
+    # Adjust references in IEC.prg/IEC.lby if present.
+    # In standalone directory mode (no *.apj), IEC files might not exist and should not block renaming.
     iec_file = file_path.parent / "IEC.prg"
     if not iec_file.exists():
-        # Adjust references in IEC.lby if it exists
         iec_file = file_path.parent / "IEC.lby"
         if not iec_file.exists():
-            return None
+            if require_iec:
+                return None
+            utils.log(
+                f"IEC.prg/IEC.lby not found next to {file_path.name} - skipping IEC reference updates.",
+                severity="WARNING",
+            )
+            iec_file = None
 
-    text = iec_file.read_text(encoding="iso-8859-1")
+    if iec_file is not None:
+        text = iec_file.read_text(encoding="iso-8859-1")
 
-    # Replace filename suffixes like 'name.ab' with 'name.st' (word boundary, case-insensitive)
-    new_text, count = re.subn(
-        r"(?i)(\b[\w/\\.-]+)\.ab\b", lambda m: m.group(1) + ".st", text
-    )
-    if count:
-        iec_file.write_text(sanitize_latin1(new_text), encoding="iso-8859-1")
-        utils.log(f"{count} IEC references updated in: {iec_file}", severity="INFO")
+        # Replace filename suffixes like 'name.ab' with 'name.st' (word boundary, case-insensitive)
+        new_text, count = re.subn(
+            r"(?i)(\b[\w/\\.-]+)\.ab\b", lambda m: m.group(1) + ".st", text
+        )
+        if count:
+            iec_file.write_text(sanitize_latin1(new_text), encoding="iso-8859-1")
+            utils.log(f"{count} IEC references updated in: {iec_file}", severity="INFO")
 
     new_file_path = file_path.with_suffix(".st")
     if new_file_path != file_path:
+        if new_file_path.exists():
+            # If a previous conversion already produced a .st, keep it as a backup
+            # instead of failing with FileExistsError.
+            backup = new_file_path.with_name(new_file_path.name + ".bak")
+            n = 1
+            while backup.exists():
+                backup = new_file_path.with_name(new_file_path.name + f".bak{n}")
+                n += 1
+            new_file_path.rename(backup)
+            utils.log(
+                f"Existing output renamed to backup: {backup}",
+                severity="WARNING",
+            )
         file_path.rename(new_file_path)
         utils.log(
             f"Renamed file: {file_path} to {new_file_path}",
@@ -712,24 +481,111 @@ def fix_keywords(file_path: Path, replacements: dict[str, str] | None = None) ->
         return 0
 
     original_content = read_latin1(file_path)
-    modified = original_content
-    total_replacements = 0
+    lines = original_content.splitlines(keepends=True)
 
+    # Precompile patterns once for speed and consistent behavior.
+    compiled: list[tuple[str, str, re.Pattern | None]] = []
     for old, new in replacements.items():
         if not old:
             continue
-        # If the keyword contains at least one word character (letters/digits/underscore),
-        # use word-boundary anchored, case-insensitive matching. Otherwise (punctuation-only
-        # tokens like '"'), do a plain literal replacement so the token is found.
         if re.search(r"\w", old):
-            pattern = r"\b" + re.escape(old) + r"\b"
-            modified, count = re.subn(pattern, new, modified, flags=re.IGNORECASE)
+            pattern = re.compile(r"\b" + re.escape(old) + r"\b", flags=re.IGNORECASE)
+            compiled.append((old, new, pattern))
         else:
-            modified, count = re.subn(re.escape(old), new, modified)
-        total_replacements += count
+            compiled.append((old, new, None))
+
+    def _apply_replacements(text: str) -> tuple[str, int]:
+        total_local = 0
+        out = text
+        for old, new, pat in compiled:
+            if pat is None:
+                out, count = re.subn(re.escape(old), new, out)
+            else:
+                out, count = pat.subn(new, out)
+            total_local += count
+        return out, total_local
+
+    def _process_preserving_comments(
+        line_text: str, in_block: bool
+    ) -> tuple[str, int, bool]:
+        """Apply replacements only to code parts, preserving // and (*...*) comments."""
+
+        i = 0
+        out_parts: list[str] = []
+        count_total = 0
+
+        while i < len(line_text):
+            if in_block:
+                end = line_text.find("*)", i)
+                if end == -1:
+                    out_parts.append(line_text[i:])
+                    return "".join(out_parts), count_total, True
+
+                out_parts.append(line_text[i : end + 2])
+                i = end + 2
+                in_block = False
+                continue
+
+            idx_line = line_text.find("//", i)
+            idx_block = line_text.find("(*", i)
+
+            # No more comments.
+            if idx_line == -1 and idx_block == -1:
+                replaced, c = _apply_replacements(line_text[i:])
+                out_parts.append(replaced)
+                count_total += c
+                break
+
+            # Line comment starts next.
+            if idx_line != -1 and (idx_block == -1 or idx_line < idx_block):
+                replaced, c = _apply_replacements(line_text[i:idx_line])
+                out_parts.append(replaced)
+                count_total += c
+                out_parts.append(line_text[idx_line:])
+                break
+
+            # Block comment starts next.
+            replaced, c = _apply_replacements(line_text[i:idx_block])
+            out_parts.append(replaced)
+            count_total += c
+
+            end = line_text.find("*)", idx_block + 2)
+            if end == -1:
+                out_parts.append(line_text[idx_block:])
+                in_block = True
+                break
+
+            out_parts.append(line_text[idx_block : end + 2])
+            i = end + 2
+
+        return "".join(out_parts), count_total, in_block
+
+    total_replacements = 0
+    in_block_comment = False
+    new_lines: list[str] = []
+
+    for line in lines:
+        if line.endswith("\r\n"):
+            newline = "\r\n"
+            base = line[:-2]
+        elif line.endswith("\n"):
+            newline = "\n"
+            base = line[:-1]
+        else:
+            newline = ""
+            base = line
+
+        processed, c, in_block_comment = _process_preserving_comments(
+            base, in_block_comment
+        )
+        total_replacements += c
+        new_lines.append(processed + newline)
 
     if total_replacements:
-        file_path.write_text(sanitize_latin1(modified), encoding="iso-8859-1")
+        file_path.write_text(
+            sanitize_latin1("".join(new_lines)),
+            encoding="iso-8859-1",
+        )
         utils.log(
             f"{total_replacements} keyword replacements in: {file_path}",
             severity="INFO",
@@ -965,56 +821,145 @@ def fix_select(file_path: Path) -> int:
     next_prefix = re.compile(r"^(\s*)NEXT\b\s+(\S+)", flags=re.IGNORECASE)
 
     # WHEN can appear as 'WHEN(' or 'WHEN condition'. We match the prefix and then
-    # split the line into condition + tail using a tail pattern that tolerates:
-    #  - spaces
-    #  - optional comment ('//...' or '(*...*)') in either position relative to ';'
-    #  - optional semicolon
+    # split the line into condition + tail, preserving the original tail order.
+    # Tail may include an inline comment ('//...' or '(*...*)') and/or a trailing ';'
+    # in either order (e.g. '; //comment' or '(*c*) ;').
     when_prefix = re.compile(r"^(\s*)WHEN\b\s*", flags=re.IGNORECASE)
-    tail_re = re.compile(r"\s*(?:(//.*|\(\*.*?\*\)))?\s*(;)?\s*$")
 
-    for line in lines:
+    def _strip_eol(s: str) -> str:
+        return s.rstrip("\r\n")
+
+    def _remove_trailing_backslash(code_part: str) -> tuple[str, bool]:
+        s = code_part.rstrip()
+        had = False
+        while s.endswith("\\"):
+            had = True
+            s = s[:-1].rstrip()
+        return s, had
+
+    def _split_tail(text: str, *, drop_semicolon: bool = False) -> tuple[str, str]:
+        """Split `text` into (code_part, tail) by peeling tokens from the end.
+
+        Tail may contain, at the very end of the line, any combination of:
+        - line comment: '//...'
+        - block comment: '(* ... *)' (single line)
+        - semicolon: ';'
+        in either order (e.g. '; //c' or '(*c*) ;' or '; (*c*)').
+
+        If drop_semicolon=True, semicolon tokens are removed from the tail.
+        This is used for WHEN→IF header lines where ';' would be invalid.
+        """
+        tmp = text
+        tail = ""
+
+        # Iteratively peel from end: comment (if at end) and/or semicolon.
+        # We keep exact whitespace around the peeled tokens.
+        while True:
+            # Trailing line comment wins (captures everything to end).
+            m_line_c = re.search(r"\s*//.*$", tmp)
+            if m_line_c:
+                tail = tmp[m_line_c.start() :] + tail
+                tmp = tmp[: m_line_c.start()]
+                continue
+
+            # Trailing block comment.
+            m_block_c = re.search(r"\s*\(\*.*?\*\)\s*$", tmp)
+            if m_block_c:
+                tail = tmp[m_block_c.start() :] + tail
+                tmp = tmp[: m_block_c.start()]
+                continue
+
+            # Trailing semicolon.
+            m_sc = re.search(r"\s*;\s*$", tmp)
+            if m_sc:
+                if not drop_semicolon:
+                    tail = tmp[m_sc.start() :] + tail
+                tmp = tmp[: m_sc.start()]
+                continue
+
+            break
+
+        return tmp, tail
+
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+
         # SELECT
         m = sel_prefix.match(line)
         if m:
             leading, sel = m.group(1), m.group(2)
             current_select = sel
-            tail = line[m.end() :].rstrip(
-                "\r\n"
+            tail = _strip_eol(
+                line[m.end() :]
             )  # preserve everything after the matched token
             new_lines.append(f"{leading}CASE {sel} OF{tail}\n")
             total += 1
+            i += 1
             continue
 
         # STATE
         m = state_prefix.match(line)
         if m:
             leading, state = m.group(1), m.group(2)
-            tail = line[m.end() :].rstrip("\r\n")
+            tail = _strip_eol(line[m.end() :])
             new_lines.append(f"{leading}{state}:{tail}\n")
             total += 1
+            i += 1
             continue
 
-        # WHEN
+        # WHEN (supports multi-line conditions using trailing '\\')
         m = when_prefix.match(line)
         if m:
             leading = m.group(1)
-            # Find tail at end-of-line to isolate condition while keeping original tail order intact.
-            m_tail = tail_re.search(line)
-            # If tail pattern found, split condition/tail by indices; else, whole rest is condition.
-            tail_start = m_tail.start() if m_tail else len(line.rstrip("\n"))
-            cond = line[m.end() : tail_start].strip()
-            tail = line[tail_start:].rstrip("\r\n") if m_tail else ""
-            new_lines.append(f"{leading}IF {cond} THEN{tail}\n")
+            raw = _strip_eol(line)
+
+            # Split first WHEN line into condition + tail (preserve tail order)
+            cond_part_raw, tail_first = _split_tail(raw[m.end() :], drop_semicolon=True)
+
+            cond_part, cont = _remove_trailing_backslash(cond_part_raw)
+            cond_part = cond_part.strip()
+
+            cond_lines: list[tuple[str, str]] = []  # (line_text_without_eol, tail)
+            cond_lines.append((f"{leading}IF {cond_part}", tail_first))
+
+            # Consume continuation lines while the previous code part ended with '\\'
+            while cont and (i + 1) < len(lines):
+                i += 1
+                raw_next = _strip_eol(lines[i])
+
+                # Preserve indentation of continuation lines
+                m_ws = re.match(r"^(\s*)", raw_next)
+                next_leading = m_ws.group(1) if m_ws else ""
+
+                # Split continuation line into code/tail preserving tail order
+                after_ws = raw_next[len(next_leading) :]
+                cond_next_raw, tail_next = _split_tail(after_ws, drop_semicolon=True)
+
+                # Remove trailing '\\' from the code part (before any tail)
+                cond_next_code, cont = _remove_trailing_backslash(cond_next_raw)
+                cond_next_code = cond_next_code.strip()
+
+                cond_lines.append((f"{next_leading}{cond_next_code}", tail_next))
+
+            # Ensure THEN appears on the last condition line (not on the '\\' line)
+            last_text, last_tail = cond_lines[-1]
+            if not re.search(r"\bTHEN\b\s*$", last_text, flags=re.IGNORECASE):
+                last_text = f"{last_text} THEN"
+            cond_lines[-1] = (last_text, last_tail)
+
+            for text, tail in cond_lines:
+                new_lines.append(f"{text}{tail}\n")
+
             total += 1
+            i += 1
             continue
 
         # NEXT
         m = next_prefix.match(line)
         if m:
             leading, nxt = m.group(1), m.group(2)
-            tail = line[m.end() :].rstrip(
-                "\r\n"
-            )  # keep comment/semicolon order exactly
+            tail = _strip_eol(line[m.end() :])  # keep comment/semicolon order exactly
             if current_select:
                 new_lines.append(f"{leading}{current_select} := {nxt}{tail}\n")
                 new_lines.append(f"{leading}END_IF\n")
@@ -1022,10 +967,12 @@ def fix_select(file_path: Path) -> int:
             else:
                 # no SELECT in scope — leave unchanged
                 new_lines.append(line)
+            i += 1
             continue
 
         # default: keep line unchanged
         new_lines.append(line)
+        i += 1
 
     if total:
         file_path.write_text(sanitize_latin1("".join(new_lines)), encoding="iso-8859-1")
@@ -1033,6 +980,121 @@ def fix_select(file_path: Path) -> int:
             f"{total} SELECT/STATE/WHEN/NEXT transformations in: {file_path}",
             severity="INFO",
         )
+
+    return total
+
+
+def fix_case(file_path: Path) -> int:
+    """Fix CASE...ENDCASE blocks by converting AB action keywords.
+
+    Between CASE and ENDCASE (case-insensitive):
+    - ELSEACTION -> ELSE
+    - ACTION, ENDACTION -> removed
+    - ENDCASE -> END_CASE (only for the closing keyword)
+
+    Comments remain intact ('//' and '(* ... *)', including multi-line block comments).
+    No replacements are performed outside CASE...ENDCASE.
+    """
+
+    original = read_latin1(file_path)
+    lines = original.splitlines(keepends=True)
+
+    re_case_start = re.compile(r"\bCASE\b", flags=re.IGNORECASE)
+    re_endcase = re.compile(r"\bEND(?:_)?CASE\b", flags=re.IGNORECASE)
+    re_elseaction_colon = re.compile(r"\bELSEACTION\b\s*:\s*", flags=re.IGNORECASE)
+    re_elseaction = re.compile(r"\bELSEACTION\b", flags=re.IGNORECASE)
+    re_action = re.compile(r"\bACTION\b", flags=re.IGNORECASE)
+    re_endaction = re.compile(r"\bENDACTION\b", flags=re.IGNORECASE)
+
+    new_lines: list[str] = []
+    total = 0
+    in_case = False
+    in_block_comment = False
+
+    for line in lines:
+        # Preserve newline
+        if line.endswith("\r\n"):
+            newline = "\r\n"
+            base = line[:-2]
+        elif line.endswith("\n"):
+            newline = "\n"
+            base = line[:-1]
+        else:
+            newline = ""
+            base = line
+
+        # If we're inside a multi-line block comment, keep it unchanged.
+        if in_block_comment:
+            new_lines.append(base + newline)
+            if "*)" in base:
+                in_block_comment = False
+            continue
+
+        # Split code and comment (respect both '//' and '(*').
+        # Include whitespace immediately before the comment marker in the comment part
+        # so we don't accidentally delete spacing when we normalize code.
+        idx_line = base.find("//")
+        idx_block = base.find("(*")
+
+        comment_idx = -1
+        if idx_block != -1 and (idx_line == -1 or idx_block < idx_line):
+            comment_idx = idx_block
+        elif idx_line != -1:
+            comment_idx = idx_line
+
+        if comment_idx != -1:
+            ws_start = comment_idx
+            while ws_start > 0 and base[ws_start - 1] in (" ", "\t"):
+                ws_start -= 1
+            code = base[:ws_start]
+            comment = base[ws_start:]
+        else:
+            code = base
+            comment = ""
+
+        # If this line starts a block comment that doesn't close on the same line,
+        # mark the following lines as being in a block comment.
+        if comment.lstrip().startswith("(*") and "*)" not in comment:
+            in_block_comment = True
+
+        # Enter CASE region if CASE appears in code (not in comment)
+        if re_case_start.search(code):
+            in_case = True
+
+        new_code = code
+        if in_case:
+            new_code, c0a = re_elseaction_colon.subn("ELSE", new_code)
+            new_code, c0b = re_elseaction.subn("ELSE", new_code)
+            new_code, c1 = re_endaction.subn("", new_code)
+            new_code, c2 = re_action.subn("", new_code)
+
+            # ENDCASE/END_CASE only replaced when closing a CASE block.
+            new_code, c3 = re_endcase.subn("END_CASE", new_code)
+
+            # Whitespace cleanup without touching indentation
+            m_indent = re.match(r"^(\s*)", new_code)
+            indent = m_indent.group(1) if m_indent else ""
+            rest = new_code[len(indent) :]
+            rest = re.sub(r"[ \t]{2,}", " ", rest)
+            rest = re.sub(r"\s+;", ";", rest)
+            if comment == "":
+                new_code = indent + rest.rstrip(" \t")
+            else:
+                new_code = indent + rest
+
+            changed = c0a + c0b + c1 + c2 + c3
+            if changed:
+                total += changed
+
+            # If we hit ENDCASE/END_CASE on this line, close the region.
+            if c3 > 0:
+                in_case = False
+
+        new_lines.append(new_code + comment + newline)
+
+    if total:
+        file_path.write_text(sanitize_latin1("".join(new_lines)), encoding="iso-8859-1")
+        utils.log(f"{total} CASE/ENDCASE conversions in: {file_path}", severity="INFO")
 
     return total
 
@@ -1294,14 +1356,56 @@ def fix_semicolon(file_path: Path, ignore_keywords: list[str] | None = None) -> 
     new_lines: list[str] = []
     total = 0
 
+    # Track multi-line control-structure headers so we don't append semicolons to
+    # continuation lines between the opening keyword and its terminator.
+    # Example:
+    #   IF (a = 1) AND
+    #      (b = 2) THEN
+    # The continuation line must NOT get a trailing ';'.
+    header_terminator: str | None = None
+
+    header_start_patterns: list[tuple[re.Pattern, str]] = [
+        (re.compile(r"^\s*IF\b", flags=re.IGNORECASE), "THEN"),
+        (re.compile(r"^\s*ELSIF\b", flags=re.IGNORECASE), "THEN"),
+        (re.compile(r"^\s*WHILE\b", flags=re.IGNORECASE), "DO"),
+        (re.compile(r"^\s*FOR\b", flags=re.IGNORECASE), "DO"),
+    ]
+
+    def _update_header_state(code_part: str) -> None:
+        """Update header_terminator based on code_part (no inline '//' comment)."""
+        nonlocal header_terminator
+
+        # If we're already in a multi-line header, check whether this line ends it.
+        if header_terminator is not None:
+            if re.search(
+                r"\b" + re.escape(header_terminator) + r"\b",
+                code_part,
+                flags=re.IGNORECASE,
+            ):
+                header_terminator = None
+            return
+
+        # Not in a header: see if this line starts one that doesn't terminate on the same line.
+        for start_pat, terminator in header_start_patterns:
+            if start_pat.search(code_part):
+                # If the terminator is already present on the same line, it's a single-line header.
+                if not re.search(
+                    r"\b" + re.escape(terminator) + r"\b",
+                    code_part,
+                    flags=re.IGNORECASE,
+                ):
+                    header_terminator = terminator
+                return
+
     def remove_trailing_backslash(code_part: str) -> tuple[str, bool]:
-        """
-        Remove a single trailing backslash from the code part (ignoring trailing spaces).
+        """Remove a single trailing backslash from the code part (ignoring trailing spaces).
+
         Returns (new_code_part, had_backslash).
         """
         s = code_part.rstrip()
-        had_backslash = s.endswith("\\")
-        if had_backslash:
+        had_backslash = False
+        while s.endswith("\\"):
+            had_backslash = True
             s = s[:-1].rstrip()
         return s, had_backslash
 
@@ -1325,8 +1429,11 @@ def fix_semicolon(file_path: Path, ignore_keywords: list[str] | None = None) -> 
             code_only_raw = before.rstrip()
             trailing_spaces = before[len(code_only_raw) :]
 
-            # NEW: detect & remove trailing backslash BEFORE ignore check
+            # Detect & remove trailing backslash BEFORE ignore check
             code_only, had_backslash = remove_trailing_backslash(code_only_raw)
+
+            # Update header tracking based on code part (without inline comment)
+            _update_header_state(code_only)
 
             # If the line matches ignore keywords -> do not add ';', but backslash is removed
             if ignore_pattern and ignore_pattern.search(line):
@@ -1335,11 +1442,13 @@ def fix_semicolon(file_path: Path, ignore_keywords: list[str] | None = None) -> 
 
             # Semicolon logic:
             # If a trailing '\' was detected, do NOT add ';'
+            # If we're inside a multi-line header (IF..THEN / WHILE..DO), do NOT add ';'
             if (
                 code_only == ""
                 or code_only.endswith(";")
                 or code_only.endswith(":")
                 or had_backslash
+                or header_terminator is not None
             ):
                 new_before = code_only + trailing_spaces
             else:
@@ -1360,8 +1469,11 @@ def fix_semicolon(file_path: Path, ignore_keywords: list[str] | None = None) -> 
                 newline = ""
                 content_raw = line
 
-            # NEW: detect & remove trailing backslash BEFORE ignore check
+            # Detect & remove trailing backslash BEFORE ignore check
             content, had_backslash = remove_trailing_backslash(content_raw)
+
+            # Update header tracking based on code part
+            _update_header_state(content)
 
             # If the line matches ignore keywords -> do not add ';', but backslash is removed
             if ignore_pattern and ignore_pattern.search(line):
@@ -1370,11 +1482,13 @@ def fix_semicolon(file_path: Path, ignore_keywords: list[str] | None = None) -> 
 
             # Semicolon logic:
             # If a trailing '\' was detected, do NOT add ';'
+            # If we're inside a multi-line header (IF..THEN / WHILE..DO), do NOT add ';'
             if (
                 content.strip() == ""
                 or content.endswith(";")
                 or content.endswith(":")
                 or had_backslash
+                or header_terminator is not None
             ):
                 new_lines.append(content + newline)
             else:
@@ -1830,10 +1944,6 @@ def fix_exitif(file_path: Path) -> int:
     return total
 
 
-from pathlib import Path
-import re
-
-
 def fix_loop(file_path: Path) -> int:
     """
     Searches for 'LOOP' and replaces it with 'FOR', as well as 'ENDLOOP' with 'END_FOR'.
@@ -1924,18 +2034,18 @@ def fix_loop(file_path: Path) -> int:
     return total_changes
 
 
-def process_file(file_path: Path) -> int:
+def process_file(file_path: Path, require_iec: bool = False) -> int:
     """Process a single .ab or .st file through all conversion functions.
     Returns the total number of changes made."""
     total_changes = 0
 
     # Log separator line before each file
-    utils.log("─" * 80, severity="INFO")
+    utils.log("-" * 80, severity="INFO")
     utils.log(f"Processing: {file_path}", severity="INFO")
 
     # If it's a .ab file, rename it first
     if file_path.suffix == ".ab":
-        new_path = rename_file(file_path)
+        new_path = rename_file(file_path, require_iec=require_iec)
         if new_path is None:
             utils.log(
                 f"IEC.prg or IEC.lby not found in directory: {file_path.parent}",
@@ -1958,6 +2068,8 @@ def process_file(file_path: Path) -> int:
         total_changes += fix_numbers(new_path)
     if CONVERSION_CONFIG["select"]:
         total_changes += fix_select(new_path)
+    if CONVERSION_CONFIG["case"]:
+        total_changes += fix_case(new_path)
     if CONVERSION_CONFIG["loop"]:
         total_changes += fix_loop(new_path)
     if CONVERSION_CONFIG["math"]:
@@ -2021,6 +2133,11 @@ Examples:
         help="Disable SELECT/STATE/WHEN/NEXT transformation",
     )
     parser.add_argument(
+        "--no-case",
+        action="store_true",
+        help="Disable CASE/ENDCASE action cleanup (ACTION/ENDACTION/ELSEACTION)",
+    )
+    parser.add_argument(
         "--no-loop", action="store_true", help="Disable LOOP/ENDLOOP conversion"
     )
     parser.add_argument(
@@ -2066,6 +2183,7 @@ def apply_config_from_args(args):
     CONVERSION_CONFIG["uppercase"] = not args.no_uppercase
     CONVERSION_CONFIG["numbers"] = not args.no_numbers
     CONVERSION_CONFIG["select"] = not args.no_select
+    CONVERSION_CONFIG["case"] = not args.no_case
     CONVERSION_CONFIG["loop"] = not args.no_loop
     CONVERSION_CONFIG["math"] = not args.no_math
     CONVERSION_CONFIG["exitif"] = not args.no_exitif
@@ -2101,7 +2219,7 @@ def main():
             "Before proceeding, make sure you have a backup or are using version control (e.g., Git).",
             severity="WARNING",
         )
-        total = process_file(input_path)
+        total = process_file(input_path, require_iec=False)
         utils.log(f"File processing complete. Total changes: {total}", severity="INFO")
 
     elif input_path.is_dir():
@@ -2117,6 +2235,8 @@ def main():
             utils.log(f"Processing directory: {project_path}")
             utils.log("No .apj file found - processing as standalone directory.\n")
 
+        require_iec = apj_file is not None
+
         utils.log(
             "This script will convert all Automation Basic tasks into Structure Text tasks.",
             severity="INFO",
@@ -2126,7 +2246,7 @@ def main():
             severity="WARNING",
         )
 
-        proceed, selections = _ask_proceed_with_options(
+        proceed, selections = ask_proceed_with_options(
             "This script will convert all Automation Basic tasks into Structure Text tasks. Do you want to proceed with converting anyway?"
         )
 
@@ -2134,7 +2254,7 @@ def main():
             utils.log("Operation cancelled. No changes were made.", severity="WARNING")
             return
 
-        _apply_config_from_checkbox_selections(selections)
+        apply_config_from_checkbox_selections(CONVERSION_CONFIG, selections)
 
         # Use Logical subdirectory if it exists, otherwise use the provided directory
         logical_path = project_path / "Logical"
@@ -2150,7 +2270,7 @@ def main():
         files_processed = 0
         for file_path in logical_path.rglob("*"):
             if file_path.suffix in {".ab"}:
-                total_changes += process_file(file_path)
+                total_changes += process_file(file_path, require_iec=require_iec)
                 files_processed += 1
 
         utils.log(

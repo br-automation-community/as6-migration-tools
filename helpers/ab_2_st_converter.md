@@ -11,7 +11,7 @@ This script is intended to convert Automation Basic code to Structured Text code
 - Hex and binary literals are converted to Structured Text format. For example, `$FF` is converted to `16#FF` and `%1010` is converted to `2#1010`.
 - Convert select statements from Automation Basic to case statements in Structured Text. The select states must be defined with constant values, otherwise the compiler will raise an error for non-constant case values.
 - Convert loop statements from Automation Basic to for statements in Structured Text.
-- Convert case statements from Automation Basic to case statements in Structured Text.
+- Convert case statements from Automation Basic to for statements in Structured Text.
 - Math functions INC and DEC are converted to `+ 1` and `- 1` respectively.
 - Assignment operator `=` is converted to `:=` in Structured Text.
 - EXITIF statements are converted to IF ... THEN ... END_IF statements with a RETURN statement inside.
@@ -40,6 +40,7 @@ The script supports various command-line switches to disable specific conversion
 | `--no-uppercase` | Disable uppercase conversion for keywords (e.g., `true` → `TRUE`) |
 | `--no-numbers` | Disable number format conversion (e.g., `$FF` → `16#FF`, `%1010` → `2#1010`) |
 | `--no-select` | Disable SELECT/STATE/WHEN/NEXT to CASE transformation |
+| `--no-case` | Disable CASE/ENDCASE action cleanup (ACTION/ENDACTION/ELSEACTION inside CASE blocks only) |
 | `--no-loop` | Disable LOOP/ENDLOOP to FOR/END_FOR conversion |
 | `--no-math` | Disable INC/DEC math function conversion |
 | `--no-exitif` | Disable EXITIF to `IF...THEN...EXIT...END_IF` conversion |
