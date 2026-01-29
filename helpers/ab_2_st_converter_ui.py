@@ -38,6 +38,7 @@ def conversion_checkbox_items() -> dict[str, str]:
         "uppercase": "Uppercase conversion",
         "numbers": "Number format conversion",
         "select": "SELECT/STATE/WHEN/NEXT transformation",
+        "case": "CASE/ENDCASE action cleanup (ACTION/ENDACTION/ELSEACTION)",
         "loop": "LOOP/ENDLOOP conversion",
         "math": "INC/DEC conversion",
         "exitif": "EXITIF conversion",

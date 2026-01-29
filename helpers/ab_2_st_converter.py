@@ -25,6 +25,7 @@ CONVERSION_CONFIG = {
     "uppercase": True,
     "numbers": True,
     "select": True,
+    "case": True,
     "loop": True,
     "math": True,
     "exitif": True,
@@ -65,10 +66,6 @@ KEYWORD_REPLACEMENTS: dict[str, str] = {
     "ELSE IF": "ELSIF",
     "LSL(": "SHL(",
     "LSR(": "SHR(",
-    "ACTION": "",
-    "ENDACTION": "",
-    "ELSEACTION": "ELSE",
-    "ENDCASE": "END_CASE",
 }
 
 # List of keyword pairs (start, end) which define regions where '=' should NOT be
@@ -894,6 +891,121 @@ def fix_select(file_path: Path) -> int:
             f"{total} SELECT/STATE/WHEN/NEXT transformations in: {file_path}",
             severity="INFO",
         )
+
+    return total
+
+
+def fix_case(file_path: Path) -> int:
+    """Fix CASE...ENDCASE blocks by converting AB action keywords.
+
+    Between CASE and ENDCASE (case-insensitive):
+    - ELSEACTION -> ELSE
+    - ACTION, ENDACTION -> removed
+    - ENDCASE -> END_CASE (only for the closing keyword)
+
+    Comments remain intact ('//' and '(* ... *)', including multi-line block comments).
+    No replacements are performed outside CASE...ENDCASE.
+    """
+
+    original = read_latin1(file_path)
+    lines = original.splitlines(keepends=True)
+
+    re_case_start = re.compile(r"\bCASE\b", flags=re.IGNORECASE)
+    re_endcase = re.compile(r"\bEND(?:_)?CASE\b", flags=re.IGNORECASE)
+    re_elseaction_colon = re.compile(r"\bELSEACTION\b\s*:\s*", flags=re.IGNORECASE)
+    re_elseaction = re.compile(r"\bELSEACTION\b", flags=re.IGNORECASE)
+    re_action = re.compile(r"\bACTION\b", flags=re.IGNORECASE)
+    re_endaction = re.compile(r"\bENDACTION\b", flags=re.IGNORECASE)
+
+    new_lines: list[str] = []
+    total = 0
+    in_case = False
+    in_block_comment = False
+
+    for line in lines:
+        # Preserve newline
+        if line.endswith("\r\n"):
+            newline = "\r\n"
+            base = line[:-2]
+        elif line.endswith("\n"):
+            newline = "\n"
+            base = line[:-1]
+        else:
+            newline = ""
+            base = line
+
+        # If we're inside a multi-line block comment, keep it unchanged.
+        if in_block_comment:
+            new_lines.append(base + newline)
+            if "*)" in base:
+                in_block_comment = False
+            continue
+
+        # Split code and comment (respect both '//' and '(*').
+        # Include whitespace immediately before the comment marker in the comment part
+        # so we don't accidentally delete spacing when we normalize code.
+        idx_line = base.find("//")
+        idx_block = base.find("(*")
+
+        comment_idx = -1
+        if idx_block != -1 and (idx_line == -1 or idx_block < idx_line):
+            comment_idx = idx_block
+        elif idx_line != -1:
+            comment_idx = idx_line
+
+        if comment_idx != -1:
+            ws_start = comment_idx
+            while ws_start > 0 and base[ws_start - 1] in (" ", "\t"):
+                ws_start -= 1
+            code = base[:ws_start]
+            comment = base[ws_start:]
+        else:
+            code = base
+            comment = ""
+
+        # If this line starts a block comment that doesn't close on the same line,
+        # mark the following lines as being in a block comment.
+        if comment.lstrip().startswith("(*") and "*)" not in comment:
+            in_block_comment = True
+
+        # Enter CASE region if CASE appears in code (not in comment)
+        if re_case_start.search(code):
+            in_case = True
+
+        new_code = code
+        if in_case:
+            new_code, c0a = re_elseaction_colon.subn("ELSE", new_code)
+            new_code, c0b = re_elseaction.subn("ELSE", new_code)
+            new_code, c1 = re_endaction.subn("", new_code)
+            new_code, c2 = re_action.subn("", new_code)
+
+            # ENDCASE/END_CASE only replaced when closing a CASE block.
+            new_code, c3 = re_endcase.subn("END_CASE", new_code)
+
+            # Whitespace cleanup without touching indentation
+            m_indent = re.match(r"^(\s*)", new_code)
+            indent = m_indent.group(1) if m_indent else ""
+            rest = new_code[len(indent):]
+            rest = re.sub(r"[ \t]{2,}", " ", rest)
+            rest = re.sub(r"\s+;", ";", rest)
+            if comment == "":
+                new_code = indent + rest.rstrip(" \t")
+            else:
+                new_code = indent + rest
+
+            changed = c0a + c0b + c1 + c2 + c3
+            if changed:
+                total += changed
+
+            # If we hit ENDCASE/END_CASE on this line, close the region.
+            if c3 > 0:
+                in_case = False
+
+        new_lines.append(new_code + comment + newline)
+
+    if total:
+        file_path.write_text(sanitize_latin1("".join(new_lines)), encoding="iso-8859-1")
+        utils.log(f"{total} CASE/ENDCASE conversions in: {file_path}", severity="INFO")
 
     return total
 
@@ -1858,6 +1970,8 @@ def process_file(file_path: Path, require_iec: bool = False) -> int:
         total_changes += fix_numbers(new_path)
     if CONVERSION_CONFIG["select"]:
         total_changes += fix_select(new_path)
+    if CONVERSION_CONFIG["case"]:
+        total_changes += fix_case(new_path)
     if CONVERSION_CONFIG["loop"]:
         total_changes += fix_loop(new_path)
     if CONVERSION_CONFIG["math"]:
@@ -1921,6 +2035,11 @@ Examples:
         help="Disable SELECT/STATE/WHEN/NEXT transformation",
     )
     parser.add_argument(
+        "--no-case",
+        action="store_true",
+        help="Disable CASE/ENDCASE action cleanup (ACTION/ENDACTION/ELSEACTION)",
+    )
+    parser.add_argument(
         "--no-loop", action="store_true", help="Disable LOOP/ENDLOOP conversion"
     )
     parser.add_argument(
@@ -1966,6 +2085,7 @@ def apply_config_from_args(args):
     CONVERSION_CONFIG["uppercase"] = not args.no_uppercase
     CONVERSION_CONFIG["numbers"] = not args.no_numbers
     CONVERSION_CONFIG["select"] = not args.no_select
+    CONVERSION_CONFIG["case"] = not args.no_case
     CONVERSION_CONFIG["loop"] = not args.no_loop
     CONVERSION_CONFIG["math"] = not args.no_math
     CONVERSION_CONFIG["exitif"] = not args.no_exitif
