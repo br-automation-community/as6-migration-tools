@@ -481,24 +481,111 @@ def fix_keywords(file_path: Path, replacements: dict[str, str] | None = None) ->
         return 0
 
     original_content = read_latin1(file_path)
-    modified = original_content
-    total_replacements = 0
+    lines = original_content.splitlines(keepends=True)
 
+    # Precompile patterns once for speed and consistent behavior.
+    compiled: list[tuple[str, str, re.Pattern | None]] = []
     for old, new in replacements.items():
         if not old:
             continue
-        # If the keyword contains at least one word character (letters/digits/underscore),
-        # use word-boundary anchored, case-insensitive matching. Otherwise (punctuation-only
-        # tokens like '"'), do a plain literal replacement so the token is found.
         if re.search(r"\w", old):
-            pattern = r"\b" + re.escape(old) + r"\b"
-            modified, count = re.subn(pattern, new, modified, flags=re.IGNORECASE)
+            pattern = re.compile(r"\b" + re.escape(old) + r"\b", flags=re.IGNORECASE)
+            compiled.append((old, new, pattern))
         else:
-            modified, count = re.subn(re.escape(old), new, modified)
-        total_replacements += count
+            compiled.append((old, new, None))
+
+    def _apply_replacements(text: str) -> tuple[str, int]:
+        total_local = 0
+        out = text
+        for old, new, pat in compiled:
+            if pat is None:
+                out, count = re.subn(re.escape(old), new, out)
+            else:
+                out, count = pat.subn(new, out)
+            total_local += count
+        return out, total_local
+
+    def _process_preserving_comments(
+        line_text: str, in_block: bool
+    ) -> tuple[str, int, bool]:
+        """Apply replacements only to code parts, preserving // and (*...*) comments."""
+
+        i = 0
+        out_parts: list[str] = []
+        count_total = 0
+
+        while i < len(line_text):
+            if in_block:
+                end = line_text.find("*)", i)
+                if end == -1:
+                    out_parts.append(line_text[i:])
+                    return "".join(out_parts), count_total, True
+
+                out_parts.append(line_text[i : end + 2])
+                i = end + 2
+                in_block = False
+                continue
+
+            idx_line = line_text.find("//", i)
+            idx_block = line_text.find("(*", i)
+
+            # No more comments.
+            if idx_line == -1 and idx_block == -1:
+                replaced, c = _apply_replacements(line_text[i:])
+                out_parts.append(replaced)
+                count_total += c
+                break
+
+            # Line comment starts next.
+            if idx_line != -1 and (idx_block == -1 or idx_line < idx_block):
+                replaced, c = _apply_replacements(line_text[i:idx_line])
+                out_parts.append(replaced)
+                count_total += c
+                out_parts.append(line_text[idx_line:])
+                break
+
+            # Block comment starts next.
+            replaced, c = _apply_replacements(line_text[i:idx_block])
+            out_parts.append(replaced)
+            count_total += c
+
+            end = line_text.find("*)", idx_block + 2)
+            if end == -1:
+                out_parts.append(line_text[idx_block:])
+                in_block = True
+                break
+
+            out_parts.append(line_text[idx_block : end + 2])
+            i = end + 2
+
+        return "".join(out_parts), count_total, in_block
+
+    total_replacements = 0
+    in_block_comment = False
+    new_lines: list[str] = []
+
+    for line in lines:
+        if line.endswith("\r\n"):
+            newline = "\r\n"
+            base = line[:-2]
+        elif line.endswith("\n"):
+            newline = "\n"
+            base = line[:-1]
+        else:
+            newline = ""
+            base = line
+
+        processed, c, in_block_comment = _process_preserving_comments(
+            base, in_block_comment
+        )
+        total_replacements += c
+        new_lines.append(processed + newline)
 
     if total_replacements:
-        file_path.write_text(sanitize_latin1(modified), encoding="iso-8859-1")
+        file_path.write_text(
+            sanitize_latin1("".join(new_lines)),
+            encoding="iso-8859-1",
+        )
         utils.log(
             f"{total_replacements} keyword replacements in: {file_path}",
             severity="INFO",
@@ -803,7 +890,9 @@ def fix_select(file_path: Path) -> int:
         if m:
             leading, sel = m.group(1), m.group(2)
             current_select = sel
-            tail = _strip_eol(line[m.end() :])  # preserve everything after the matched token
+            tail = _strip_eol(
+                line[m.end() :]
+            )  # preserve everything after the matched token
             new_lines.append(f"{leading}CASE {sel} OF{tail}\n")
             total += 1
             i += 1
@@ -985,7 +1074,7 @@ def fix_case(file_path: Path) -> int:
             # Whitespace cleanup without touching indentation
             m_indent = re.match(r"^(\s*)", new_code)
             indent = m_indent.group(1) if m_indent else ""
-            rest = new_code[len(indent):]
+            rest = new_code[len(indent) :]
             rest = re.sub(r"[ \t]{2,}", " ", rest)
             rest = re.sub(r"\s+;", ";", rest)
             if comment == "":
@@ -1288,7 +1377,11 @@ def fix_semicolon(file_path: Path, ignore_keywords: list[str] | None = None) -> 
 
         # If we're already in a multi-line header, check whether this line ends it.
         if header_terminator is not None:
-            if re.search(r"\b" + re.escape(header_terminator) + r"\b", code_part, flags=re.IGNORECASE):
+            if re.search(
+                r"\b" + re.escape(header_terminator) + r"\b",
+                code_part,
+                flags=re.IGNORECASE,
+            ):
                 header_terminator = None
             return
 
@@ -1296,7 +1389,11 @@ def fix_semicolon(file_path: Path, ignore_keywords: list[str] | None = None) -> 
         for start_pat, terminator in header_start_patterns:
             if start_pat.search(code_part):
                 # If the terminator is already present on the same line, it's a single-line header.
-                if not re.search(r"\b" + re.escape(terminator) + r"\b", code_part, flags=re.IGNORECASE):
+                if not re.search(
+                    r"\b" + re.escape(terminator) + r"\b",
+                    code_part,
+                    flags=re.IGNORECASE,
+                ):
                     header_terminator = terminator
                 return
 
@@ -1845,6 +1942,7 @@ def fix_exitif(file_path: Path) -> int:
         )
 
     return total
+
 
 def fix_loop(file_path: Path) -> int:
     """
