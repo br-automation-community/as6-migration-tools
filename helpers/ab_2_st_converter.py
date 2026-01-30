@@ -690,20 +690,33 @@ def fix_numbers(file_path: Path) -> int:
     """
     Replace hex numeric literals that use the `$` prefix (e.g. `$FF`) with the
     `16#FF` notation, and binary literals that use the `%` prefix (e.g. `%1010`)
-    with the `2#1010` notation. Uses word-boundary matching so trailing characters
-    are not accidentally captured. Returns number of replacements.
+    with the `2#1010` notation.
+
+    Also supports `_` digit separators in the source literals (e.g. `%1010_1010`,
+    `$DEAD_BEEF`). Underscores are preserved in the output.
+
+    Uses word-boundary matching so trailing characters are not accidentally
+    captured. Returns number of replacements.
     """
     original = read_latin1(file_path)
     total_count = 0
 
-    # Match '$' followed by one or more hex digits, followed by a word boundary
-    hex_pattern = r"\$([0-9A-Fa-f]+)\b"
-    modified, hex_count = re.subn(hex_pattern, r"16#\1", original)
+    # Match '$' followed by hex digits with optional '_' separators, followed by a word boundary
+    hex_pattern = r"\$([0-9A-Fa-f]+(?:_[0-9A-Fa-f]+)*)\b"
+    modified, hex_count = re.subn(
+        hex_pattern,
+        lambda m: "16#" + m.group(1),
+        original,
+    )
     total_count += hex_count
 
-    # Match '%' followed by one or more binary digits, followed by a word boundary
-    bin_pattern = r"%([01]+)\b"
-    modified, bin_count = re.subn(bin_pattern, r"2#\1", modified)
+    # Match '%' followed by binary digits with optional '_' separators, followed by a word boundary
+    bin_pattern = r"%([01]+(?:_[01]+)*)\b"
+    modified, bin_count = re.subn(
+        bin_pattern,
+        lambda m: "2#" + m.group(1),
+        modified,
+    )
     total_count += bin_count
 
     if total_count:
