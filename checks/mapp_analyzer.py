@@ -30,7 +30,6 @@ def mapp_license_analyzer(project_path: Path):
                     for obj in result["mappView"]["breaseWidgets"]:
                         if "widgets.brease." + obj["name"] in line:
                             obj["cnt"] += 1
-                break
 
     services = utils.load_file_info("licenses", "mapp_services")
     result["mappServices"] = {"services": []}
