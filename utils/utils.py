@@ -228,7 +228,7 @@ def extract_urls(text):
 def linkify(text):
     links = get_links()
     for link in links:
-        if link in text:
+        if re.search(rf"\b{re.escape(link)}\b", text):
             text = text.replace(link, url(link))
     urls = extract_urls(text)
     for u in urls:
