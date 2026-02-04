@@ -479,7 +479,10 @@ def fix_manual(file_path: Path) -> int:
 
 def fix_keywords(file_path: Path, replacements: dict[str, str] | None = None) -> int:
     """
-    Replace keywords in the file according to `replacements` mapping (word-boundary matches).
+    Replace keywords in the file according to `replacements` mapping.
+
+    Replacements are skipped when the matched text is immediately preceded by '#'
+    (e.g. '#ENDIF' is left untouched).
     Returns the total number of replacements made.
     """
     if replacements is None:
@@ -492,24 +495,26 @@ def fix_keywords(file_path: Path, replacements: dict[str, str] | None = None) ->
     lines = original_content.splitlines(keepends=True)
 
     # Precompile patterns once for speed and consistent behavior.
-    compiled: list[tuple[str, str, re.Pattern | None]] = []
+    # We apply word-boundaries only when they make sense (i.e. when the token
+    # starts/ends with a word character). This allows patterns like 'LSL('.
+    compiled: list[tuple[str, str, re.Pattern]] = []
     for old, new in replacements.items():
         if not old:
             continue
-        if re.search(r"\w", old):
-            pattern = re.compile(r"\b" + re.escape(old) + r"\b", flags=re.IGNORECASE)
-            compiled.append((old, new, pattern))
-        else:
-            compiled.append((old, new, None))
+
+        prefix = r"(?<!#)"
+        if re.match(r"^\w", old):
+            prefix += r"\b"
+        suffix = r"\b" if re.search(r"\w$", old) else ""
+
+        pattern = re.compile(prefix + re.escape(old) + suffix, flags=re.IGNORECASE)
+        compiled.append((old, new, pattern))
 
     def _apply_replacements(text: str) -> tuple[str, int]:
         total_local = 0
         out = text
         for old, new, pat in compiled:
-            if pat is None:
-                out, count = re.subn(re.escape(old), new, out)
-            else:
-                out, count = pat.subn(new, out)
+            out, count = pat.subn(new, out)
             total_local += count
         return out, total_local
 
