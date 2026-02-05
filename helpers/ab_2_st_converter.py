@@ -611,6 +611,7 @@ def fix_upper_case(file_path: Path, keywords: list[str] | None = None) -> int:
     """
     Convert occurrences of keywords in `keywords` to upper-case (word-boundary, case-insensitive).
     Does not alter text inside line-comments starting with '//' (preserves comments as-is).
+    Skips matches that are immediately preceded by '#'.
     Returns the number of actual changes made (only counts when text was actually modified).
     """
     if keywords is None:
@@ -645,7 +646,7 @@ def fix_upper_case(file_path: Path, keywords: list[str] | None = None) -> int:
                 left_look = r"(?<=\s)" if kw.startswith(" ") else ""
                 right_look = r"(?=\s)" if kw.endswith(" ") else ""
                 inner = re.escape(kw.strip())
-                pattern = left_look + inner + right_look
+                pattern = left_look + r"(?<!#)" + inner + right_look
                 repl = kw.strip().upper()
 
                 # Custom replacement that only counts actual changes
@@ -665,9 +666,11 @@ def fix_upper_case(file_path: Path, keywords: list[str] | None = None) -> int:
                 # inside longer identifiers (e.g., 'COMMAND' should not match 'AND').
                 # Only apply trailing lookahead when kw ends with a word char.
                 if re.search(r"\w$", kw):
-                    pattern = r"(?<![a-zA-Z0-9_])" + re.escape(kw) + r"(?![a-zA-Z0-9_])"
+                    pattern = (
+                        r"(?<![#a-zA-Z0-9_])" + re.escape(kw) + r"(?![a-zA-Z0-9_])"
+                    )
                 else:
-                    pattern = r"(?<![a-zA-Z0-9_])" + re.escape(kw)
+                    pattern = r"(?<![#a-zA-Z0-9_])" + re.escape(kw)
 
                 # Custom replacement that only counts actual changes
                 def replace_func(match):
