@@ -634,6 +634,14 @@
     "8I44xxxxxxx.xxx-1",
     "8I84xxxxxxx.01P-1"
   ],
+  "ACOPOSmulti - Generic variants with -x no longer supported with AS 6.x - Replace with -1, -3 or -4": [
+    "8BVIxxxxxxDS.xxx-x",
+    "8BVIxxxxxxDx.xxx-x",
+    "8BVIxxxxxxSA.xxx-x",
+    "8BVIxxxxxxSS.xxx-x",
+    "8BVIxxxxxxSx.xxx-x",
+    "8BVPxxxxxxxx.xxx-x"
+  ],
   "8LS motors - No longer supported with AS 6.x": [
     "8LSA25.E8060D000-0",
     "8LSA25.E8060D200-0",
