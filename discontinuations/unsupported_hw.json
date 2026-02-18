@@ -632,8 +632,6 @@
   ],
   "ACOPOSinverter - No longer supported with AS 6.x": [
     "8I44xxxxxxx.xxx-1",
-    "8I64xxxxxxx.00x-1",
-    "8I74xxxxxxx.01P-1",
     "8I84xxxxxxx.01P-1"
   ],
   "ACOPOSmulti - Generic variants with -x no longer supported with AS 6.x - Replace with -1, -3 or -4": [
