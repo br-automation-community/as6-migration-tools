@@ -26,6 +26,7 @@ def check_hardware(physical_path: Path, log, verbose=False) -> None:
     log(utils.section_header("hardware", "Checking for invalid hardware..."))
 
     unsupported_hardware = utils.load_discontinuation_info("unsupported_hw")
+    special_handling_hw = unsupported_hardware.pop("special_handling", {})
     hardware_results = utils.scan_files_parallel(
         physical_path,
         [".hw"],
@@ -60,6 +61,16 @@ def check_hardware(physical_path: Path, log, verbose=False) -> None:
     else:
         if verbose:
             log("No unsupported hardware found in the project.", severity="INFO")
+
+    special_handling_results = utils.scan_files_parallel(
+        physical_path,
+        [".hw"],
+        process_hw_file,
+        {"special_handling": list(special_handling_hw.keys())},
+    )
+    if special_handling_results:
+        for hw, _, _ in special_handling_results:
+            log(special_handling_hw[hw], severity="WARNING")
 
 
 def count_hardware(folder: Path) -> dict:
