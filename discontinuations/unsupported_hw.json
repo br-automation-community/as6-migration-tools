@@ -772,5 +772,8 @@
   ],
   "Accessories (8Port industrial hub) - No longer supported with AS 6.x : Replace with 0AC808.9-1": [
     "0AC808.9"
-  ]
+  ],
+  "special_handling": {
+    "5AP923.1505-I00": "The hardware module \"5AP923.1505-I00\" is supported but wrongly marked as discontinued in some AS versions. Please check this community entry on how to migrate: https://community.br-automation.com/t/upgrade-project-with-5ap923-1505-i00-to-as6/10470"
+  }
 }
