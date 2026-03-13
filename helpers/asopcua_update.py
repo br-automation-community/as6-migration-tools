@@ -167,6 +167,7 @@ def main():
 
     enum_mapping = {
         "UAAttributeId": "UAAttributeID",
+        "UANodeAdditionalInfo.AttributeId": "UANodeAdditionalInfo.AttributeID",
         "UAIdentifierType_String": "UAIT_String",
         "UAIdentifierType_Numeric": "UAIT_Numeric",
         "UAIdentifierType_GUID": "UAIT_GUID",
