@@ -990,12 +990,13 @@ def fix_select(file_path: Path) -> int:
             leading, nxt = m.group(1), m.group(2)
             tail = _strip_eol(line[m.end() :])  # keep comment/semicolon order exactly
             if current_select:
-                # Look ahead: if there is code between this NEXT and the next STATE/ENDSELECT,
-                # insert 'continue;' before END_IF so that trailing code is skipped.
-                has_code_after = False
-                for j in range(i + 1, len(lines)):
-                    look = lines[j].strip()
-                    if not look:
+                # Look ahead: collect code lines between this NEXT and the next
+                # STATE/SELECT/ENDSELECT/END_CASE and place them in an ELSE block.
+                trailing_lines: list[str] = []
+                j = i + 1
+                while j < len(lines):
+                    if not lines[j].strip():
+                        j += 1
                         continue  # skip blank lines
                     if (
                         state_prefix.match(lines[j])
@@ -1004,13 +1005,18 @@ def fix_select(file_path: Path) -> int:
                             r"^\s*(ENDSELECT|END_CASE)\b", lines[j], re.IGNORECASE
                         )
                     ):
-                        break  # reached next STATE/SELECT/ENDSELECT/END_CASE — no code in between
-                    has_code_after = True
-                    break
+                        break  # reached next STATE/SELECT/ENDSELECT/END_CASE
+                    trailing_lines.append(lines[j])
+                    j += 1
+
+                # Advance i to the line before the next boundary so that consumed
+                # lines (including skipped blanks) are not processed again.
+                i = j - 1
 
                 new_lines.append(f"{leading}{current_select} := {nxt}{tail}\n")
-                if has_code_after:
-                    new_lines.append(f"{leading}continue;\n")
+                if trailing_lines:
+                    new_lines.append(f"{leading}ELSE\n")
+                    new_lines.extend(trailing_lines)
                 new_lines.append(f"{leading}END_IF\n")
                 total += 1
             else:
