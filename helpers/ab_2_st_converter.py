@@ -855,6 +855,8 @@ def fix_select(file_path: Path) -> int:
     # in either order (e.g. '; //comment' or '(*c*) ;').
     when_prefix = re.compile(r"^(\s*)WHEN\b\s*", flags=re.IGNORECASE)
 
+    boundary_prefix = re.compile(r"^\s*(ENDSELECT|END_CASE)\b", flags=re.IGNORECASE)
+
     def _strip_eol(s: str) -> str:
         return s.rstrip("\r\n")
 
@@ -876,7 +878,7 @@ def fix_select(file_path: Path) -> int:
         in either order (e.g. '; //c' or '(*c*) ;' or '; (*c*)').
 
         If drop_semicolon=True, semicolon tokens are removed from the tail.
-        This is used for WHEN→IF header lines where ';' would be invalid.
+        This is used for WHEN->IF header lines where ';' would be invalid.
         """
         tmp = text
         tail = ""
@@ -910,6 +912,208 @@ def fix_select(file_path: Path) -> int:
 
         return tmp, tail
 
+    def _parse_when_header(src_lines: list[str], start_idx: int):
+        """Parse WHEN header (with optional '\\' continuation lines).
+
+        Returns (header_lines, if_indent, next_idx_after_header) or None.
+        """
+        nonlocal total
+        m = when_prefix.match(src_lines[start_idx])
+        if not m:
+            return None
+
+        leading = m.group(1)
+        raw = _strip_eol(src_lines[start_idx])
+
+        cond_part_raw, tail_first = _split_tail(raw[m.end() :], drop_semicolon=True)
+        cond_part, cont = _remove_trailing_backslash(cond_part_raw)
+        cond_part = cond_part.strip()
+
+        cond_lines: list[tuple[str, str]] = []
+        cond_lines.append((f"{leading}IF {cond_part}", tail_first))
+
+        idx = start_idx
+        while cont and (idx + 1) < len(src_lines):
+            idx += 1
+            raw_next = _strip_eol(src_lines[idx])
+
+            m_ws = re.match(r"^(\s*)", raw_next)
+            next_leading = m_ws.group(1) if m_ws else ""
+
+            after_ws = raw_next[len(next_leading) :]
+            cond_next_raw, tail_next = _split_tail(after_ws, drop_semicolon=True)
+
+            cond_next_code, cont = _remove_trailing_backslash(cond_next_raw)
+            cond_next_code = cond_next_code.strip()
+            cond_lines.append((f"{next_leading}{cond_next_code}", tail_next))
+
+        last_text, last_tail = cond_lines[-1]
+        if not re.search(r"\bTHEN\b\s*$", last_text, flags=re.IGNORECASE):
+            last_text = f"{last_text} THEN"
+        cond_lines[-1] = (last_text, last_tail)
+
+        total += 1  # WHEN -> IF
+        return [f"{text}{tail}\n" for text, tail in cond_lines], leading, idx + 1
+
+    def _convert_next_line(line: str) -> tuple[str, str | None, bool]:
+        """Convert NEXT target to '<select> := target'.
+
+        Returns (line_out, indent, converted_flag).
+        """
+        nonlocal total
+        m = next_prefix.match(line)
+        if not m or not current_select:
+            return line, None, False
+
+        leading, nxt = m.group(1), m.group(2)
+        tail = _strip_eol(line[m.end() :])
+        total += 1  # NEXT -> assignment
+        return f"{leading}{current_select} := {nxt}{tail}\n", leading, True
+
+    def _convert_when_chain(state_lines: list[str]) -> list[str]:
+        """Convert sequential WHEN...NEXT blocks in a STATE into nested IF/ELSE.
+
+        Pattern:
+            WHEN c1 ... NEXT x1
+            pre2
+            WHEN c2 ... NEXT x2
+            pre3
+            WHEN c3 ... NEXT x3
+            tail
+
+        becomes:
+            IF c1 THEN ... x1
+            ELSE
+                pre2
+                IF c2 THEN ... x2
+                ELSE
+                    pre3
+                    IF c3 THEN ... x3
+                    ELSE
+                        tail
+                    END_IF
+                END_IF
+            END_IF
+        """
+        out: list[str] = []
+
+        idx = 0
+        while idx < len(state_lines):
+            parsed = _parse_when_header(state_lines, idx)
+            if not parsed:
+                out.append(state_lines[idx])
+                idx += 1
+                continue
+
+            # Build one complete WHEN chain starting at idx.
+            branches: list[tuple[list[str], list[str], list[str], str, bool]] = []
+            while idx < len(state_lines):
+                parsed = _parse_when_header(state_lines, idx)
+                if not parsed:
+                    break
+                header_lines, if_indent, pos = parsed
+                idx = pos
+
+                then_lines: list[str] = []
+                converted_next = False
+
+                while idx < len(state_lines):
+                    if when_prefix.match(state_lines[idx]):
+                        break
+
+                    converted_line, _, did_convert = _convert_next_line(
+                        state_lines[idx]
+                    )
+                    if did_convert:
+                        then_lines.append(converted_line)
+                        idx += 1
+                        converted_next = True
+                        break
+
+                    then_lines.append(state_lines[idx])
+                    idx += 1
+
+                else_preamble: list[str] = []
+                while idx < len(state_lines) and not when_prefix.match(
+                    state_lines[idx]
+                ):
+                    else_preamble.append(state_lines[idx])
+                    idx += 1
+
+                branches.append(
+                    (header_lines, then_lines, else_preamble, if_indent, converted_next)
+                )
+
+                # Without NEXT this is not a valid AB WHEN/NEXT branch chain.
+                # Stop nesting and keep remaining content unchanged.
+                if not converted_next:
+                    break
+
+                if idx >= len(state_lines) or not when_prefix.match(state_lines[idx]):
+                    break
+
+            if not branches:
+                continue
+
+            def _add_prefix_to_lines(src: list[str], prefix: str) -> list[str]:
+                if not prefix:
+                    return src
+                out_prefixed: list[str] = []
+                for ln in src:
+                    if ln.strip():
+                        out_prefixed.append(prefix + ln)
+                    else:
+                        out_prefixed.append(ln)
+                return out_prefixed
+
+            def _infer_indent_unit(
+                if_indent: str, then_lines: list[str], else_lines: list[str]
+            ) -> str:
+                for candidate in then_lines + else_lines:
+                    raw = _strip_eol(candidate)
+                    if not raw.strip():
+                        continue
+                    m_ws = re.match(r"^(\s*)", raw)
+                    leading_ws = m_ws.group(1) if m_ws else ""
+                    if leading_ws.startswith(if_indent) and len(leading_ws) > len(
+                        if_indent
+                    ):
+                        return leading_ws[len(if_indent) :]
+                return "\t"
+
+            def _emit_branch(branch_idx: int, prefix: str = ""):
+                header_lines, then_lines, else_preamble, if_indent, has_next = branches[
+                    branch_idx
+                ]
+
+                out.extend(_add_prefix_to_lines(header_lines, prefix))
+                out.extend(_add_prefix_to_lines(then_lines, prefix))
+
+                has_nested = branch_idx + 1 < len(branches)
+                normalized_else = list(else_preamble)
+                while normalized_else and not normalized_else[0].strip():
+                    normalized_else.pop(0)
+                while normalized_else and not normalized_else[-1].strip():
+                    normalized_else.pop()
+
+                has_meaningful_else = any(line.strip() for line in normalized_else)
+                if has_meaningful_else or has_nested:
+                    out.append(f"{prefix}{if_indent}ELSE\n")
+                    indent_unit = _infer_indent_unit(
+                        if_indent, then_lines, normalized_else
+                    )
+                    nested_prefix = prefix + indent_unit
+                    out.extend(_add_prefix_to_lines(normalized_else, nested_prefix))
+                    if has_nested:
+                        _emit_branch(branch_idx + 1, nested_prefix)
+
+                if has_next:
+                    out.append(f"{prefix}{if_indent}END_IF\n")
+
+            _emit_branch(0)
+
+        return out
+
     i = 0
     while i < len(lines):
         line = lines[i]
@@ -919,109 +1123,52 @@ def fix_select(file_path: Path) -> int:
         if m:
             leading, sel = m.group(1), m.group(2)
             current_select = sel
-            tail = _strip_eol(
-                line[m.end() :]
-            )  # preserve everything after the matched token
+            tail = _strip_eol(line[m.end() :])
             new_lines.append(f"{leading}CASE {sel} OF{tail}\n")
             total += 1
             i += 1
             continue
 
-        # STATE
+        # STATE + nested WHEN-chain transformation inside the state body
         m = state_prefix.match(line)
         if m:
             leading, state = m.group(1), m.group(2)
             tail = _strip_eol(line[m.end() :])
             new_lines.append(f"{leading}{state}:{tail}\n")
             total += 1
-            i += 1
+
+            j = i + 1
+            state_body: list[str] = []
+            while j < len(lines):
+                if (
+                    state_prefix.match(lines[j])
+                    or sel_prefix.match(lines[j])
+                    or boundary_prefix.match(lines[j])
+                ):
+                    break
+                state_body.append(lines[j])
+                j += 1
+
+            if state_body:
+                new_lines.extend(_convert_when_chain(state_body))
+
+            i = j
             continue
 
-        # WHEN (supports multi-line conditions using trailing '\\')
-        m = when_prefix.match(line)
-        if m:
-            leading = m.group(1)
-            raw = _strip_eol(line)
-
-            # Split first WHEN line into condition + tail (preserve tail order)
-            cond_part_raw, tail_first = _split_tail(raw[m.end() :], drop_semicolon=True)
-
-            cond_part, cont = _remove_trailing_backslash(cond_part_raw)
-            cond_part = cond_part.strip()
-
-            cond_lines: list[tuple[str, str]] = []  # (line_text_without_eol, tail)
-            cond_lines.append((f"{leading}IF {cond_part}", tail_first))
-
-            # Consume continuation lines while the previous code part ended with '\\'
-            while cont and (i + 1) < len(lines):
-                i += 1
-                raw_next = _strip_eol(lines[i])
-
-                # Preserve indentation of continuation lines
-                m_ws = re.match(r"^(\s*)", raw_next)
-                next_leading = m_ws.group(1) if m_ws else ""
-
-                # Split continuation line into code/tail preserving tail order
-                after_ws = raw_next[len(next_leading) :]
-                cond_next_raw, tail_next = _split_tail(after_ws, drop_semicolon=True)
-
-                # Remove trailing '\\' from the code part (before any tail)
-                cond_next_code, cont = _remove_trailing_backslash(cond_next_raw)
-                cond_next_code = cond_next_code.strip()
-
-                cond_lines.append((f"{next_leading}{cond_next_code}", tail_next))
-
-            # Ensure THEN appears on the last condition line (not on the '\\' line)
-            last_text, last_tail = cond_lines[-1]
-            if not re.search(r"\bTHEN\b\s*$", last_text, flags=re.IGNORECASE):
-                last_text = f"{last_text} THEN"
-            cond_lines[-1] = (last_text, last_tail)
-
-            for text, tail in cond_lines:
-                new_lines.append(f"{text}{tail}\n")
-
-            total += 1
-            i += 1
+        # WHEN outside a STATE block: still convert defensively.
+        parsed = _parse_when_header(lines, i)
+        if parsed:
+            header_lines, _, next_i = parsed
+            new_lines.extend(header_lines)
+            i = next_i
             continue
 
-        # NEXT
-        m = next_prefix.match(line)
-        if m:
-            leading, nxt = m.group(1), m.group(2)
-            tail = _strip_eol(line[m.end() :])  # keep comment/semicolon order exactly
-            if current_select:
-                # Look ahead: collect code lines between this NEXT and the next
-                # STATE/SELECT/ENDSELECT/END_CASE and place them in an ELSE block.
-                trailing_lines: list[str] = []
-                j = i + 1
-                while j < len(lines):
-                    if not lines[j].strip():
-                        j += 1
-                        continue  # skip blank lines
-                    if (
-                        state_prefix.match(lines[j])
-                        or sel_prefix.match(lines[j])
-                        or re.match(
-                            r"^\s*(ENDSELECT|END_CASE)\b", lines[j], re.IGNORECASE
-                        )
-                    ):
-                        break  # reached next STATE/SELECT/ENDSELECT/END_CASE
-                    trailing_lines.append(lines[j])
-                    j += 1
-
-                # Advance i to the line before the next boundary so that consumed
-                # lines (including skipped blanks) are not processed again.
-                i = j - 1
-
-                new_lines.append(f"{leading}{current_select} := {nxt}{tail}\n")
-                if trailing_lines:
-                    new_lines.append(f"{leading}ELSE\n")
-                    new_lines.extend(trailing_lines)
-                new_lines.append(f"{leading}END_IF\n")
-                total += 1
-            else:
-                # no SELECT in scope — leave unchanged
-                new_lines.append(line)
+        # NEXT outside a STATE block: convert to assignment and close IF.
+        converted_line, indent, did_convert = _convert_next_line(line)
+        if did_convert:
+            new_lines.append(converted_line)
+            if indent is not None:
+                new_lines.append(f"{indent}END_IF\n")
             i += 1
             continue
 
