@@ -2167,6 +2167,11 @@ def fix_loop(file_path: Path) -> int:
     re_loop_at_start = re.compile(r"^(\s*)LOOP\b", flags=re.IGNORECASE)
     # Only whitespace / ';' / '\' after?
     re_only_trivia_after_loop = re.compile(r"^[\s;\\]*$")
+    # LOOP var = from DOWNTO to DO -> FOR var := from TO to BY -1 DO
+    re_loop_downto = re.compile(
+        r"\bLOOP\s+(\w+)\s*=\s*(.+?)\s+DOWNTO\s+(.+?)\s+DO\b",
+        flags=re.IGNORECASE,
+    )
 
     warn_text = "### CONVERSION ERROR ### This code snippet can not be converted automatically. Use REPEAT...END_REPEAT or WHILE...END_WHILE instead."
 
@@ -2205,6 +2210,17 @@ def fix_loop(file_path: Path) -> int:
 
         # Otherwise normal replacements in code part (comments remain)
         new_code = code
+
+        # Special case: LOOP var = from DOWNTO to DO -> FOR var := from TO to BY -1 DO
+        new_code, c_downto = re_loop_downto.subn(
+            lambda m: f"FOR {m.group(1)} := {m.group(2).strip()} TO {m.group(3).strip()} BY -1 DO",
+            new_code,
+        )
+        if c_downto > 0:
+            new_code, c1 = re_endloop_word.subn("END_FOR", new_code)
+            conversions += c_downto + c1
+            new_lines.append(new_code + comment + newline)
+            continue
 
         # ENDLOOP -> END_FOR
         new_code, c1 = re_endloop_word.subn("END_FOR", new_code)
