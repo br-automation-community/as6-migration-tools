@@ -50,6 +50,7 @@
     "SYS_battery": "Supports SG3 only",
     "SYS_info": "Supports SG3 only",
     "SYSxinfo": "Supports SG3 only",
+    "TARGETInfo": "The version of the operating system can be determined via the OSVersionMajor, OSVersionMinor, OSVersionPatch and OSVersionBuild functions.",
     "UT_exit": "Supports SG3 only",
     "UT_freemsg": "Supports SG3 only",
     "UT_ident": "Supports SG3 only",
