@@ -40,7 +40,7 @@
   "IO_lib": "Supports SG3 only",
   "IotMqtt": "The library IotMqtt may be built with an obsolete version (\u2264 4.73.0), which is not compatible with AS6. - You can check for an updated AS6-compatible version here: https://github.com/br-automation-community?q=mqtt",
   "Logging": "Has been replaced by library AsArProf",
-  "LoopCont": "This library has been replaced by the mapp Temperature and mapp Control Tools libraries. You can also use the LoopConR as a 1:1 replacement for the LoopCont library in existing projects, but it is not recommended for new projects.",
+  "LoopCont": "This library has been replaced by the mapp Temperature and mapp Control Tools libraries. You can also use the LoopConR as a substitute for the LoopCont library in existing projects, but it is not recommended for new projects.",
   "MTIdent": "Recommended replacement: mapp Control Tools",
   "MTTension": "The library is not supported in Automation Studio 6.1",
   "MpAlarm": "Replaced by successor mapp AlarmX",
